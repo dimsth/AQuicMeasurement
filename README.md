@@ -2,10 +2,28 @@
 
 Simple C programs to make a Quic connection using the ngtcp2 library.
 
-## Instalation
+## Requiremnts
+
+The following are required to build the project:
+
+- ngtcp2 library
+
+To install ngtcp2:
 
 ```
-git clone https://github.com/dimsth/AQuicMeasurement.git
+git clone https://github.com/ngtcp2/ngtcp2.git
+cd ngtcp2
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+
+## Build
+
+```
 mkdir build
 cd build
 cmake ..
