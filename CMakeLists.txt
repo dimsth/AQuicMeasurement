@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 3.26.4)
 project(AQuicMeasurement)
 
+# Remove all files from the build folder
+file(GLOB files_to_remove ${CMAKE_BINARY_DIR}/*)
+foreach(file ${files_to_remove})
+    if(IS_DIRECTORY ${file})
+        file(REMOVE_RECURSE ${file})
+    else()
+        file(REMOVE ${file})
+    endif()
+endforeach()
+
 # Sources for server
 set(SOURCES1
     src/quic_server.c
