@@ -21,6 +21,20 @@ set(SOURCES2
     src/quic_client.c
 )
 
+#Server
 add_executable(q_server ${SOURCES1})
 
+# Include the ngtcp2 library header file directory
+target_include_directories(q_server PRIVATE /usr/local/include)
+
+# Link against the ngtcp2 library
+target_link_libraries(q_server PRIVATE ngtcp2)
+
+#Client
 add_executable(q_client ${SOURCES2})
+
+# Include the ngtcp2 library header file directory
+target_include_directories(q_client PRIVATE /usr/local/include)
+
+# Link against the ngtcp2 library
+target_link_libraries(q_client PRIVATE ngtcp2)
