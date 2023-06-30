@@ -4,22 +4,31 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#define PORT 8800
 
 int main(int argc, char **argv) {
   printf("Server");
 
-  int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+  int opt = 1;
+  int sockfd = socket(AF_LOCAL, SOCK_DGRAM, 0);
   if (sockfd < 0) {
     perror("socket");
     exit(EXIT_FAILURE);
   }
 
+  /* Forcefully attaching socket to the port 8080 */
+  int ret_ss = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt,
+                          sizeof(opt));
+  if (ret_ss) {
+    perror("setsockopt");
+    exit(EXIT_FAILURE);
+  }
+
   /* Set up server address */
   struct sockaddr_in server_addr;
-  memset(&server_addr, 0, sizeof(server_addr));
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(12345);
-  server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  server_addr.sin_family = AF_LOCAL;
+  server_addr.sin_port = htons(PORT);
+  server_addr.sin_addr.s_addr = INADDR_ANY;
 
   /* Bind the socket to the server address */
   if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
