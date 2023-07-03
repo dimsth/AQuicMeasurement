@@ -33,5 +33,33 @@ int main(int argc, char **argv) {
     return -1;
   }
 
+  ngtcp2_settings sett;
+  ngtcp2_settings_default(&sett);
+
+  ngtcp2_transport_params param;
+  ngtcp2_transport_params_default(&param);
+  param.original_dcid_present = 1;
+
+  ngtcp2_conn *conn;
+  ngtcp2_cid dcid;
+  ngtcp2_cid scid;
+
+  int dest_id = 1;
+  int sour_id = 2;
+
+  dcid.datalen = sizeof(dest_id);
+  memcpy(dcid.data, &dest_id, dcid.datalen);
+
+  scid.datalen = sizeof(sour_id);
+  memcpy(scid.data, &sour_id, scid.datalen);
+
+  int ret =
+      ngtcp2_conn_client_new(&conn, &dcid, &scid, NULL, NGTCP2_PROTO_VER_V1,
+                             NULL, &sett, &param, NULL, NULL);
+
+  if (ret) {
+    printf("=====Out of memory=====");
+  }
+
   return 0;
 }
