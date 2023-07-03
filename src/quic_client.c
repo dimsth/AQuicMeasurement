@@ -10,7 +10,7 @@
 
 int main(int argc, char **argv) {
 
-  assert(argc == 1);
+  assert(argc == 2);
 
   printf("Client");
 
@@ -38,7 +38,6 @@ int main(int argc, char **argv) {
 
   ngtcp2_transport_params param;
   ngtcp2_transport_params_default(&param);
-  param.original_dcid_present = 1;
 
   ngtcp2_conn *conn;
   ngtcp2_cid dcid;
