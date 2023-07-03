@@ -39,6 +39,10 @@ int main(int argc, char **argv) {
   ngtcp2_settings sett;
   ngtcp2_settings_default(&sett);
 
+  ngtcp2_transport_params param;
+  ngtcp2_transport_params_default(&param);
+  param.original_dcid_present = 1;
+
   ngtcp2_conn *conn;
   ngtcp2_cid dcid;
   ngtcp2_cid scid;
@@ -54,7 +58,7 @@ int main(int argc, char **argv) {
 
   int ret =
       ngtcp2_conn_server_new(&conn, &dcid, &scid, NULL, NGTCP2_PROTO_VER_V1,
-                             NULL, &sett, NULL, NULL, NULL);
+                             NULL, &sett, &param, NULL, NULL);
 
   if (ret) {
     printf("=====Out of memory=====");
