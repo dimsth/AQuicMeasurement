@@ -29,7 +29,7 @@ add_executable(q_server ${SOURCES1})
 target_include_directories(q_server PRIVATE /usr/local/include)
 
 # Link against the ngtcp2 library
-target_link_libraries(q_server PRIVATE ngtcp2)
+target_link_libraries(q_server PRIVATE ngtcp2 ngtcp2_crypto_openssl)
 
 target_compile_options(q_server PRIVATE -Wall -Wextra -pedantic -g)
 
@@ -40,6 +40,6 @@ add_executable(q_client ${SOURCES2})
 target_include_directories(q_client PRIVATE /usr/local/include)
 
 # Link against the ngtcp2 library
-target_link_libraries(q_client PRIVATE ngtcp2)
+target_link_libraries(q_client PRIVATE ngtcp2 ngtcp2_crypto_openssl)
 
 target_compile_options(q_client PRIVATE -Wall -Wextra -pedantic -g)
