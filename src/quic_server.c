@@ -106,12 +106,13 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 
 int main(int argc, char **argv) {
   QUIC_STATUS status;
-
+  int err;
   status = MsQuicOpen2(&Quic_api);
 
   if (status != QUIC_STATUS_SUCCESS) {
     printf("Failed to open msquic library.\n");
-    return -1;
+    err = 0;
+    goto Error;
   }
 
   // Create the configuration
@@ -122,7 +123,8 @@ int main(int argc, char **argv) {
       ((QUIC_REGISTRATION_OPEN_FN)Quic_api->RegistrationOpen)(&regConfig, &reg);
   if (status != QUIC_STATUS_SUCCESS || reg == NULL) {
     printf("Failed to make QUIC_Registrations.\n");
-    return -1;
+    err = 1;
+    goto Error;
   }
 
   QUIC_BUFFER buf = {sizeof("sample") - 1, (uint8_t *)"sample"};
@@ -131,7 +133,8 @@ int main(int argc, char **argv) {
 
   if (status != QUIC_STATUS_SUCCESS) {
     printf("Failed to make QUIC_Configuration.\n");
-    return -1;
+    err = 2;
+    goto Error;
   }
   // Create the listener
   HQUIC listener;
@@ -140,7 +143,8 @@ int main(int argc, char **argv) {
 
   if (status != QUIC_STATUS_SUCCESS) {
     printf("Failed to open listener.\n");
-    return -1;
+    err = 3;
+    goto Error;
   }
 
   QUIC_ADDR addr = {.Ip = {.sa_family = AF_INET, .sa_data = *argv[1]}};
@@ -149,18 +153,26 @@ int main(int argc, char **argv) {
 
   if (status != QUIC_STATUS_SUCCESS) {
     printf("Failed to start listener.\n");
-    return -1;
+    err = 4;
+    goto Error;
   }
   // Wait for a key press to exit
   printf("Server running. Press enter to exit...\n");
   getchar();
 
   // Cleanup and exit
-  Quic_api->ListenerStop(listener);
-  Quic_api->ListenerClose(listener);
-  Quic_api->ConfigurationClose(configuration);
-  Quic_api->RegistrationClose(reg);
+Error:
 
-  MsQuicClose(Quic_api);
+  if (err > 4)
+    Quic_api->ListenerStop(listener);
+  if (err > 3)
+    Quic_api->ListenerClose(listener);
+  if (err > 2)
+    Quic_api->ConfigurationClose(configuration);
+  if (err > 1)
+    Quic_api->RegistrationClose(reg);
+  if (err >= 0)
+    MsQuicClose(Quic_api);
+
   return 0;
 }
