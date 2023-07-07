@@ -1,31 +1,43 @@
 # A Quic Measurement
 
-Simple C programs to make a Quic connection using the ngtcp2 library.
+Simple C programs to make a Quic connection using the msquic library.
+https://github.com/microsoft/msquic
 
 ## Requiremnts
 
 The following are required to build the project:
 
-- ngtcp2 library
+- cmake
+- msquic library
 
 To install ngtcp2:
 
 ```
-git clone https://github.com/ngtcp2/ngtcp2.git
-cd ngtcp2
-mkdir build
-cd build
+git clone https://github.com/microsoft/msquic
+```
+```
+cd msquic 
+```
+```
+mkdir build && cd build
+```
+```
 cmake ..
+```
+```
 make
+```
+```
 sudo make install
 ```
 
 
 ## Build
 
+To build the project
+
 ```
-mkdir build
-cd build
+mkdir build && cd build
 cmake ..
 ```
 
