@@ -1,78 +1,151 @@
-#include <arpa/inet.h>
-#include <assert.h>
-#include <netinet/in.h>
-#include <ngtcp2/ngtcp2.h>
-#include <ngtcp2/ngtcp2_crypto.h>
+#include <msquic.h>
+#include <msquic_posix.h>
+#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
+
 #define PORT 8800
+
+#ifndef UNREFERENCED_PARAMETER
+#define UNREFERENCED_PARAMETER(P) (void)(P)
+#endif
+
+QUIC_API_TABLE *Quic_api;
+HQUIC configuration;
+
+//
+// The clients's callback for connection events from MsQuic.
+//
+_IRQL_requires_max_(DISPATCH_LEVEL)
+    _Function_class_(QUIC_CONNECTION_CALLBACK) QUIC_STATUS QUIC_API
+    ClientConnectionCallback(_In_ HQUIC Connection, _In_opt_ void *Context,
+                             _Inout_ QUIC_CONNECTION_EVENT *Event) {
+  UNREFERENCED_PARAMETER(Context);
+  switch (Event->Type) {
+  case QUIC_CONNECTION_EVENT_CONNECTED:
+    //
+    // The handshake has completed for the connection.
+    //
+    printf("[conn][%p] Connected\n", Connection);
+    // ClientSend(Connection);
+    break;
+  case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
+    //
+    // The connection has been shut down by the transport. Generally, this
+    // is the expected way for the connection to shut down with this
+    // protocol, since we let idle timeout kill the connection.
+    //
+    if (Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status ==
+        QUIC_STATUS_CONNECTION_IDLE) {
+      printf("[conn][%p] Successfully shut down on idle.\n", Connection);
+    } else {
+      printf("[conn][%p] Shut down by transport, 0x%x\n", Connection,
+             Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
+    }
+    break;
+  case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
+    //
+    // The connection was explicitly shut down by the peer.
+    //
+    printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection,
+           (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
+    break;
+  case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
+    //
+    // The connection has completed the shutdown process and is ready to be
+    // safely cleaned up.
+    //
+    printf("[conn][%p] All done\n", Connection);
+    if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
+      Quic_api->ConnectionClose(Connection);
+    }
+    break;
+  case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
+    //
+    // A resumption ticket (also called New Session Ticket or NST) was
+    // received from the server.
+    //
+    printf("[conn][%p] Resumption ticket received (%u bytes):\n", Connection,
+           Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
+    for (uint32_t i = 0;
+         i < Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength; i++) {
+      printf("%.2X",
+             (uint8_t)Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket[i]);
+    }
+    printf("\n");
+    break;
+  default:
+    break;
+  }
+  return QUIC_STATUS_SUCCESS;
+}
 
 int main(int argc, char **argv) {
 
-  assert(argc == 2);
+  QUIC_STATUS status;
+  int err;
+  const char *ResumptionTicketString = NULL;
+  HQUIC conn = NULL;
 
-  printf("Client");
+  status = MsQuicOpen2(&Quic_api);
 
-  printf("Server to connect: %s", argv[1]);
-
-  int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sockfd < 0) {
-    perror("socket");
-    exit(EXIT_FAILURE);
+  if (status != QUIC_STATUS_SUCCESS) {
+    printf("Failed to open msquic library.\n");
+    err = 0;
+    goto Error;
   }
 
-  /* Set up server address */
-  struct sockaddr_in server_addr;
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(PORT);
-
-  /* Convert IPv4 and IPv6 addresses from text to binary form */
-  if (inet_pton(AF_INET, argv[1], &server_addr.sin_addr) <= 0) {
-    printf("\nInvalid address/ Address not supported \n");
-    return -1;
+  QUIC_REGISTRATION_CONFIG regConfig = {0};
+  HQUIC reg;
+  QUIC_SETTINGS settings = {0};
+  status =
+      ((QUIC_REGISTRATION_OPEN_FN)Quic_api->RegistrationOpen)(&regConfig, &reg);
+  if (status != QUIC_STATUS_SUCCESS || reg == NULL) {
+    printf("Failed to make QUIC_Registrations.\n");
+    err = 1;
+    goto Error;
   }
 
-  ngtcp2_settings sett;
-  ngtcp2_settings_default(&sett);
+  QUIC_BUFFER buf = {sizeof("sample") - 1, (uint8_t *)"sample"};
+  status = ((QUIC_CONFIGURATION_OPEN_FN)Quic_api->ConfigurationOpen)(
+      reg, &buf, 1, &settings, sizeof(settings), NULL, &configuration);
 
-  ngtcp2_transport_params param;
-  ngtcp2_transport_params_default(&param);
-
-  const ngtcp2_callbacks callbacks = {
-      /* Use the default implementation from ngtcp2_crypto */
-      .recv_client_initial = ngtcp2_crypto_recv_client_initial_cb,
-      .recv_crypto_data = ngtcp2_crypto_recv_crypto_data_cb,
-      .encrypt = ngtcp2_crypto_encrypt_cb,
-      .decrypt = ngtcp2_crypto_decrypt_cb,
-      .hp_mask = ngtcp2_crypto_hp_mask_cb,
-      .recv_retry = ngtcp2_crypto_recv_retry_cb,
-      .update_key = ngtcp2_crypto_update_key_cb,
-      .delete_crypto_aead_ctx = ngtcp2_crypto_delete_crypto_aead_ctx_cb,
-      .delete_crypto_cipher_ctx = ngtcp2_crypto_delete_crypto_cipher_ctx_cb,
-      .get_path_challenge_data = ngtcp2_crypto_get_path_challenge_data_cb};
-
-  ngtcp2_conn *conn;
-  ngtcp2_cid dcid;
-  ngtcp2_cid scid;
-
-  int dest_id = 1;
-  int sour_id = 2;
-
-  dcid.datalen = sizeof(dest_id);
-  memcpy(dcid.data, &dest_id, dcid.datalen);
-
-  scid.datalen = sizeof(sour_id);
-  memcpy(scid.data, &sour_id, scid.datalen);
-
-  int ret =
-      ngtcp2_conn_client_new(&conn, &dcid, &scid, NULL, NGTCP2_PROTO_VER_V1,
-                             NULL, &sett, &param, NULL, NULL);
-
-  if (ret) {
-    printf("=====Out of memory=====");
+  if (status != QUIC_STATUS_SUCCESS) {
+    printf("Failed to make QUIC_Configuration.\n");
+    err = 2;
+    goto Error;
   }
+
+  status = Quic_api->ConnectionOpen(reg, ClientConnectionCallback, NULL, &conn);
+
+  if (status != QUIC_STATUS_SUCCESS) {
+    printf("Failed to open Connection.\n");
+    err = 3;
+    goto Error;
+  }
+
+  printf("[conn][%p] Connecting...\n", conn);
+  fflush(stdout);
+
+  status = Quic_api->ConnectionStart(conn, configuration,
+                                     QUIC_ADDRESS_FAMILY_UNSPEC, argv[1], PORT);
+  if (status != QUIC_STATUS_SUCCESS) {
+    printf("Failed to start Connection.\n");
+    err = 4;
+    goto Error;
+  }
+
+Error:
+
+  if (err > 4)
+    Quic_api->ConnectionShutdown(conn, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
+  if (err > 3)
+    Quic_api->ConnectionClose(conn);
+  if (err > 2)
+    Quic_api->ConfigurationClose(configuration);
+  if (err > 1)
+    Quic_api->RegistrationClose(reg);
+  if (err >= 0)
+    MsQuicClose(Quic_api);
 
   return 0;
 }

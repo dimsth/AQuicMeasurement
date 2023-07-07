@@ -1,82 +1,166 @@
-#include <netinet/in.h>
-#include <ngtcp2/ngtcp2.h>
-#include <ngtcp2/ngtcp2_crypto.h>
+#include <msquic.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
-#include <sys/socket.h>
+
 #define PORT 8800
 
+#ifndef UNREFERENCED_PARAMETER
+#define UNREFERENCED_PARAMETER(P) (void)(P)
+#endif
+
+QUIC_API_TABLE *Quic_api;
+HQUIC configuration;
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+    _Function_class_(QUIC_CONNECTION_CALLBACK) QUIC_STATUS QUIC_API
+    ServerConnectionCallback(_In_ HQUIC Connection, _In_opt_ void *Context,
+                             _Inout_ QUIC_CONNECTION_EVENT *Event) {
+  UNREFERENCED_PARAMETER(Context);
+  switch (Event->Type) {
+  case QUIC_CONNECTION_EVENT_CONNECTED:
+    //
+    // The handshake has completed for the connection.
+    //
+    printf("[conn][%p] Connected\n", Connection);
+    Quic_api->ConnectionSendResumptionTicket(
+        Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
+    break;
+  case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
+    //
+    // The connection has been shut down by the transport. Generally, this
+    // is the expected way for the connection to shut down with this
+    // protocol, since we let idle timeout kill the connection.
+    //
+    if (Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status ==
+        QUIC_STATUS_CONNECTION_IDLE) {
+      printf("[conn][%p] Successfully shut down on idle.\n", Connection);
+    } else {
+      printf("[conn][%p] Shut down by transport, 0x%x\n", Connection,
+             Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
+    }
+    break;
+  case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
+    //
+    // The connection was explicitly shut down by the peer.
+    //
+    printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection,
+           (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
+    break;
+  case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
+    //
+    // The connection has completed the shutdown process and is ready to be
+    // safely cleaned up.
+    //
+    printf("[conn][%p] All done\n", Connection);
+    Quic_api->ConnectionClose(Connection);
+    break;
+  case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
+    //
+    // The peer has started/created a new stream. The app MUST set the
+    // callback handler before returning.
+    //
+    printf("[strm][%p] Peer started\n", Event->PEER_STREAM_STARTED.Stream);
+    // Quic_api->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
+    // (void*)ServerStreamCallback, NULL);
+    break;
+  case QUIC_CONNECTION_EVENT_RESUMED:
+    //
+    // The connection succeeded in doing a TLS resumption of a previous
+    // connection's session.
+    //
+    printf("[conn][%p] Connection resumed!\n", Connection);
+    break;
+  default:
+    break;
+  }
+  return QUIC_STATUS_SUCCESS;
+}
+
+//
+// The server's callback for listener events from MsQuic.
+//
+_IRQL_requires_max_(PASSIVE_LEVEL)
+    _Function_class_(QUIC_LISTENER_CALLBACK) QUIC_STATUS QUIC_API
+    ServerListenerCallback(_In_ HQUIC Listener, _In_opt_ void *Context,
+                           _Inout_ QUIC_LISTENER_EVENT *Event) {
+  UNREFERENCED_PARAMETER(Listener);
+  UNREFERENCED_PARAMETER(Context);
+  QUIC_STATUS Status = QUIC_STATUS_NOT_SUPPORTED;
+  switch (Event->Type) {
+  case QUIC_LISTENER_EVENT_NEW_CONNECTION:
+    //
+    // A new connection is being attempted by a client. For the handshake to
+    // proceed, the server must provide a configuration for QUIC to use. The
+    // app MUST set the callback handler before returning.
+    //
+    Quic_api->SetCallbackHandler(Event->NEW_CONNECTION.Connection,
+                                 (void *)ServerConnectionCallback, NULL);
+    Status = Quic_api->ConnectionSetConfiguration(
+        Event->NEW_CONNECTION.Connection, configuration);
+    break;
+  default:
+    break;
+  }
+  return Status;
+}
+
 int main(int argc, char **argv) {
-  printf("Server");
+  QUIC_STATUS status;
 
-  int opt = 1;
-  int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sockfd < 0) {
-    perror("socket");
-    exit(EXIT_FAILURE);
+  status = MsQuicOpen2(&Quic_api);
+
+  if (status != QUIC_STATUS_SUCCESS) {
+    printf("Failed to open msquic library.\n");
+    return -1;
   }
 
-  /* Forcefully attaching socket to the port 8080 */
-  int ret_ss = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt,
-                          sizeof(opt));
-  if (ret_ss) {
-    perror("setsockopt");
-    exit(EXIT_FAILURE);
+  // Create the configuration
+  QUIC_REGISTRATION_CONFIG regConfig = {0};
+  HQUIC reg;
+  QUIC_SETTINGS settings = {0};
+  status =
+      ((QUIC_REGISTRATION_OPEN_FN)Quic_api->RegistrationOpen)(&regConfig, &reg);
+  if (status != QUIC_STATUS_SUCCESS || reg == NULL) {
+    printf("Failed to make QUIC_Registrations.\n");
+    return -1;
   }
 
-  /* Set up server address */
-  struct sockaddr_in server_addr;
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(PORT);
-  server_addr.sin_addr.s_addr = INADDR_ANY;
+  QUIC_BUFFER buf = {sizeof("sample") - 1, (uint8_t *)"sample"};
+  status = ((QUIC_CONFIGURATION_OPEN_FN)Quic_api->ConfigurationOpen)(
+      reg, &buf, 1, &settings, sizeof(settings), NULL, &configuration);
 
-  /* Bind the socket to the server address */
-  if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-    perror("bind");
-    exit(EXIT_FAILURE);
+  if (status != QUIC_STATUS_SUCCESS) {
+    printf("Failed to make QUIC_Configuration.\n");
+    return -1;
+  }
+  // Create the listener
+  HQUIC listener;
+  status = ((QUIC_LISTENER_OPEN_FN)Quic_api->ListenerOpen)(
+      reg, ServerListenerCallback, NULL, &listener);
+
+  if (status != QUIC_STATUS_SUCCESS) {
+    printf("Failed to open listener.\n");
+    return -1;
   }
 
-  ngtcp2_settings sett;
-  ngtcp2_settings_default(&sett);
+  QUIC_ADDR addr = {.Ip = {.sa_family = AF_INET, .sa_data = *argv[1]}};
+  status = ((QUIC_LISTENER_START_FN)Quic_api->ListenerStart)(listener, &buf, 1,
+                                                             &addr);
 
-  ngtcp2_transport_params param;
-  ngtcp2_transport_params_default(&param);
-  param.original_dcid_present = 1;
-
-  const ngtcp2_callbacks callbacks = {
-      /* Use the default implementation from ngtcp2_crypto */
-      .recv_client_initial = ngtcp2_crypto_recv_client_initial_cb,
-      .recv_crypto_data = ngtcp2_crypto_recv_crypto_data_cb,
-      .encrypt = ngtcp2_crypto_encrypt_cb,
-      .decrypt = ngtcp2_crypto_decrypt_cb,
-      .hp_mask = ngtcp2_crypto_hp_mask_cb,
-      .recv_retry = ngtcp2_crypto_recv_retry_cb,
-      .update_key = ngtcp2_crypto_update_key_cb,
-      .delete_crypto_aead_ctx = ngtcp2_crypto_delete_crypto_aead_ctx_cb,
-      .delete_crypto_cipher_ctx = ngtcp2_crypto_delete_crypto_cipher_ctx_cb,
-      .get_path_challenge_data = ngtcp2_crypto_get_path_challenge_data_cb};
-
-  ngtcp2_conn *conn;
-  ngtcp2_cid dcid;
-  ngtcp2_cid scid;
-
-  int dest_id = 1;
-  int sour_id = 2;
-
-  dcid.datalen = sizeof(dest_id);
-  memcpy(dcid.data, &dest_id, dcid.datalen);
-
-  scid.datalen = sizeof(sour_id);
-  memcpy(scid.data, &sour_id, scid.datalen);
-
-  int ret =
-      ngtcp2_conn_server_new(&conn, &dcid, &scid, NULL, NGTCP2_PROTO_VER_V1,
-                             NULL, &sett, &param, NULL, NULL);
-
-  if (ret) {
-    printf("=====Out of memory=====");
+  if (status != QUIC_STATUS_SUCCESS) {
+    printf("Failed to start listener.\n");
+    return -1;
   }
+  // Wait for a key press to exit
+  printf("Server running. Press enter to exit...\n");
+  getchar();
 
+  // Cleanup and exit
+  Quic_api->ListenerStop(listener);
+  Quic_api->ListenerClose(listener);
+  Quic_api->ConfigurationClose(configuration);
+  Quic_api->RegistrationClose(reg);
+
+  MsQuicClose(Quic_api);
   return 0;
 }
