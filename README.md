@@ -10,7 +10,7 @@ The following are required to build the project:
 - cmake
 - msquic library
 
-To install ngtcp2:
+To install msquic:
 
 ```
 git clone https://github.com/microsoft/msquic
