@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 3.26.4)
+cmake_minimum_required(VERSION 3.17.4)
 project(AQuicMeasurement)
+
+include(FetchContent)
 
 # Remove all files from the build folder
 file(GLOB files_to_remove ${CMAKE_BINARY_DIR}/*)
@@ -25,21 +27,34 @@ set(SOURCES2
 #Server
 add_executable(q_server ${SOURCES1})
 
-# Include the ngtcp2 library header file directory
+# Include the msquic library header file directory
 target_include_directories(q_server PRIVATE /usr/local/include/)
-
-# Link against the ngtcp2 library
-target_link_libraries(q_server PRIVATE msquic)
-
-target_compile_options(q_server PRIVATE -g)
 
 #Client
 add_executable(q_client ${SOURCES2})
 
-# Include the ngtcp2 library header file directory
+# Include the msquic library header file directory
 target_include_directories(q_client PRIVATE /usr/local/include/)
 
-# Link against the ngtcp2 library
+FetchContent_GetProperties(msquic)
+
+FetchContent_Declare(
+  msquic
+  GIT_REPOSITORY https://github.com/microsoft/msquic.git
+  GIT_TAG main
+  GIT_PROGRESS TRUE)
+
+if(NOT msquic_POPULATED)
+  FetchContent_Populate(msquic)
+  add_subdirectory(${msquic_SOURCE_DIR} ${msquic_BINARY_DIR})
+  FetchContent_MakeAvailable(msquic)
+endif()
+
+FetchContent_MakeAvailable(msquic)
+
+# Link against the msquic library
+target_link_libraries(q_server PRIVATE msquic)
 target_link_libraries(q_client PRIVATE msquic)
 
+target_compile_options(q_server PRIVATE -g)
 target_compile_options(q_client PRIVATE -g)
