@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
   status = MsQuicOpen2(&Quic_api);
 
   if (status != QUIC_STATUS_SUCCESS) {
-    printf("Failed to open msquic library.\n");
+    printf("Failed to open msquic library. Error code: %d\n", status);
     err = 0;
     goto Error;
   }
@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
   status =
       ((QUIC_REGISTRATION_OPEN_FN)Quic_api->RegistrationOpen)(&regConfig, &reg);
   if (status != QUIC_STATUS_SUCCESS || reg == NULL) {
-    printf("Failed to make QUIC_Registrations.\n");
+    printf("Failed to make QUIC_Registrations. Error code: %d\n", status);
     err = 1;
     goto Error;
   }
@@ -109,8 +109,8 @@ int main(int argc, char **argv) {
   status = ((QUIC_CONFIGURATION_OPEN_FN)Quic_api->ConfigurationOpen)(
       reg, &buf, 1, &settings, sizeof(settings), NULL, &configuration);
 
-  if (status != QUIC_STATUS_SUCCESS) {
-    printf("Failed to make QUIC_Configuration.\n");
+  if (status != QUIC_STATUS_SUCCESS || configuration == NULL) {
+    printf("Failed to make QUIC_Configuration. Error code: %d\n", status);
     err = 2;
     goto Error;
   }
@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
   status = Quic_api->ConnectionOpen(reg, ClientConnectionCallback, NULL, &conn);
 
   if (status != QUIC_STATUS_SUCCESS) {
-    printf("Failed to open Connection.\n");
+    printf("Failed to open Connection. Error code: %d\n", status);
     err = 3;
     goto Error;
   }
@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
   status = Quic_api->ConnectionStart(conn, configuration,
                                      QUIC_ADDRESS_FAMILY_UNSPEC, argv[1], PORT);
   if (status != QUIC_STATUS_SUCCESS) {
-    printf("Failed to start Connection.\n");
+    printf("Failed to start Connection. Error code: %d\n", status);
     err = 4;
     goto Error;
   }
