@@ -26,20 +26,20 @@ set(SOURCES2
 add_executable(q_server ${SOURCES1})
 
 # Include the ngtcp2 library header file directory
-target_include_directories(q_server PRIVATE /usr/local/include)
+target_include_directories(q_server PRIVATE /usr/local/include/)
 
 # Link against the ngtcp2 library
-target_link_libraries(q_server PRIVATE ngtcp2 ngtcp2_crypto_openssl)
+target_link_libraries(q_server PRIVATE msquic)
 
-target_compile_options(q_server PRIVATE -Wall -Wextra -pedantic -g)
+target_compile_options(q_server PRIVATE -g)
 
 #Client
 add_executable(q_client ${SOURCES2})
 
 # Include the ngtcp2 library header file directory
-target_include_directories(q_client PRIVATE /usr/local/include)
+target_include_directories(q_client PRIVATE /usr/local/include/)
 
 # Link against the ngtcp2 library
-target_link_libraries(q_client PRIVATE ngtcp2 ngtcp2_crypto_openssl)
+target_link_libraries(q_client PRIVATE msquic)
 
-target_compile_options(q_client PRIVATE -Wall -Wextra -pedantic -g)
+target_compile_options(q_client PRIVATE -g)
