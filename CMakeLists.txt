@@ -1,4 +1,8 @@
 cmake_minimum_required(VERSION 3.17.4)
+
+set( CMAKE_CXX_COMPILER "/usr/bin/g++" )
+set( CMAKE_C_COMPILER "/usr/bin/gcc" )
+
 project(AQuicMeasurement)
 
 include(FetchContent)
