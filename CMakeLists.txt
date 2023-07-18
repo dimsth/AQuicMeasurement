@@ -1,12 +1,10 @@
 cmake_minimum_required(VERSION 3.17.4)
 
-set( CMAKE_CXX_COMPILER "/usr/bin/g++" )
-set( CMAKE_C_COMPILER "/usr/bin/gcc" )
-
 project(AQuicMeasurement)
 
-include(FetchContent)
-
+include_directories(
+    ${CMAKE_SOURCE_DIR}/../msquic/src/inc/
+)
 # Remove all files from the build folder
 file(GLOB files_to_remove ${CMAKE_BINARY_DIR}/*)
 foreach(file ${files_to_remove})
@@ -32,29 +30,13 @@ set(SOURCES2
 add_executable(q_server ${SOURCES1})
 
 # Include the msquic library header file directory
-target_include_directories(q_server PRIVATE /usr/local/include/)
+target_include_directories(q_server PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/src/inc/)
 
 #Client
 add_executable(q_client ${SOURCES2})
 
 # Include the msquic library header file directory
-target_include_directories(q_client PRIVATE /usr/local/include/)
-
-FetchContent_GetProperties(msquic)
-
-FetchContent_Declare(
-  msquic
-  GIT_REPOSITORY https://github.com/microsoft/msquic.git
-  GIT_TAG main
-  GIT_PROGRESS TRUE)
-
-if(NOT msquic_POPULATED)
-  FetchContent_Populate(msquic)
-  add_subdirectory(${msquic_SOURCE_DIR} ${msquic_BINARY_DIR})
-  FetchContent_MakeAvailable(msquic)
-endif()
-
-FetchContent_MakeAvailable(msquic)
+target_include_directories(q_client PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/src/inc/)
 
 # Link against the msquic library
 target_link_libraries(q_server PRIVATE msquic)
