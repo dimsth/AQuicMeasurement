@@ -8,7 +8,6 @@ Microsoft has build a simple client/server sample to run IETF Quic.
 (Look at cert folder: ```cd ../cert/```)
 
 -Build the project.
-<br /><br /><br />
 
 ## Run the sample
 
@@ -18,5 +17,5 @@ Run the server first:<br />
 Then the client:<br />
 ```./ms_sample -client -unsecure -target:"IPAddress" ``` <br />
 --IPAddress = the ip of the server (for example: 196.1.1.1)
-<br />
+<br /><br />
 (Note: you can find the ip with ```ip address show```)
