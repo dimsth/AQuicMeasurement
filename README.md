@@ -19,6 +19,9 @@ git clone https://github.com/microsoft/msquic
 cd msquic 
 ```
 ```
+git submodule update --init --recursive
+```
+```
 mkdir build && cd build
 ```
 ```
@@ -27,10 +30,6 @@ cmake ..
 ```
 make
 ```
-```
-sudo make install
-```
-
 
 ## Build
 
