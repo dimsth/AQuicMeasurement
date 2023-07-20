@@ -107,6 +107,7 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 int main(int argc, char **argv) {
   QUIC_STATUS status;
   int err;
+
   status = MsQuicOpen2(&Quic_api);
 
   if (status != QUIC_STATUS_SUCCESS) {
@@ -117,29 +118,39 @@ int main(int argc, char **argv) {
 
   // Create the configuration
   QUIC_REGISTRATION_CONFIG regConfig = {0};
-  HQUIC reg;
-  QUIC_SETTINGS settings = {0};
-  status =
-      ((QUIC_REGISTRATION_OPEN_FN)Quic_api->RegistrationOpen)(&regConfig, &reg);
-  if (status != QUIC_STATUS_SUCCESS || reg == NULL) {
+  HQUIC registration;
+  status = ((QUIC_REGISTRATION_OPEN_FN)Quic_api->RegistrationOpen)(
+      &regConfig, &registration);
+  if (status != QUIC_STATUS_SUCCESS || registration == NULL) {
     printf("Failed to make QUIC_Registrations.\n");
     err = 1;
     goto Error;
   }
 
+  QUIC_SETTINGS settings = {0};
+  settings.IdleTimeoutMs = 1000;
+  settings.IsSet.IdleTimeoutMs = TRUE;
+
+  settings.ServerResumptionLevel = QUIC_SERVER_RESUME_AND_ZERORTT;
+  settings.IsSet.ServerResumptionLevel = TRUE;
+
+  settings.PeerBidiStreamCount = 1;
+  settings.IsSet.PeerBidiStreamCount = TRUE;
+
   QUIC_BUFFER buf = {sizeof("sample") - 1, (uint8_t *)"sample"};
   status = ((QUIC_CONFIGURATION_OPEN_FN)Quic_api->ConfigurationOpen)(
-      reg, &buf, 1, &settings, sizeof(settings), NULL, &configuration);
+      registration, &buf, 1, &settings, sizeof(settings), NULL, &configuration);
 
   if (status != QUIC_STATUS_SUCCESS) {
     printf("Failed to make QUIC_Configuration.\n");
     err = 2;
     goto Error;
   }
+
   // Create the listener
   HQUIC listener;
   status = ((QUIC_LISTENER_OPEN_FN)Quic_api->ListenerOpen)(
-      reg, ServerListenerCallback, NULL, &listener);
+      registration, ServerListenerCallback, NULL, &listener);
 
   if (status != QUIC_STATUS_SUCCESS) {
     printf("Failed to open listener.\n");
@@ -147,7 +158,10 @@ int main(int argc, char **argv) {
     goto Error;
   }
 
-  QUIC_ADDR addr = {.Ip = {.sa_family = AF_INET, .sa_data = *argv[1]}};
+  QUIC_ADDR addr = {0};
+  addr.Ipv4.sin_family = QUIC_ADDRESS_FAMILY_UNSPEC;
+  addr.Ipv4.sin_port = htons(PORT);
+
   status = ((QUIC_LISTENER_START_FN)Quic_api->ListenerStart)(listener, &buf, 1,
                                                              &addr);
 
@@ -159,7 +173,7 @@ int main(int argc, char **argv) {
   // Wait for a key press to exit
   printf("Server running. Press enter to exit...\n");
   getchar();
-
+  err = 5;
   // Cleanup and exit
 Error:
 
@@ -170,7 +184,7 @@ Error:
   if (err > 2)
     Quic_api->ConfigurationClose(configuration);
   if (err > 1)
-    Quic_api->RegistrationClose(reg);
+    Quic_api->RegistrationClose(registration);
   if (err >= 0)
     MsQuicClose(Quic_api);
 
