@@ -42,6 +42,12 @@ cmake ..
 
 (Note: for any changes in the programs, there is no need of removing the build file, just run "cmake .." in the build folder)
 
+## Sample
+
+The sample is made by microsoft and is a simple client/server program that makes a connection and send messages.<br />
+
+To run see the files ```cert/``` and ```ms_sample/```
+
 ## Usage
 
 In progress
