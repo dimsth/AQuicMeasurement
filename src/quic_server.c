@@ -11,6 +11,16 @@
 QUIC_API_TABLE *Quic_api;
 HQUIC configuration;
 
+typedef struct QUIC_CREDENTIAL_CONFIG_HELPER {
+  QUIC_CREDENTIAL_CONFIG CredConfig;
+  union {
+    QUIC_CERTIFICATE_HASH CertHash;
+    QUIC_CERTIFICATE_HASH_STORE CertHashStore;
+    QUIC_CERTIFICATE_FILE CertFile;
+    QUIC_CERTIFICATE_FILE_PROTECTED CertFileProtected;
+  };
+} QUIC_CREDENTIAL_CONFIG_HELPER;
+
 _IRQL_requires_max_(DISPATCH_LEVEL)
     _Function_class_(QUIC_CONNECTION_CALLBACK) QUIC_STATUS QUIC_API
     ServerConnectionCallback(_In_ HQUIC Connection, _In_opt_ void *Context,
@@ -150,14 +160,16 @@ int main(int argc, char **argv) {
     goto Error;
   }
 
-  QUIC_CREDENTIAL_CONFIG Config;
+  QUIC_CREDENTIAL_CONFIG_HELPER Config;
   memset(&Config, 0, sizeof(Config));
-  Config.Flags = QUIC_CREDENTIAL_FLAG_NONE;
-  Config.CertificateFile->CertificateFile = (char *)Cert;
-  Config.CertificateFile->PrivateKeyFile = (char *)Key;
-  Config.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+  Config.CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
+  Config.CertFile.CertificateFile = (char *)Cert;
+  Config.CertFile.PrivateKeyFile = (char *)Key;
+  Config.CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+  Config.CredConfig.CertificateFile = &Config.CertFile;
 
-  status = Quic_api->ConfigurationLoadCredential(configuration, &Config);
+  status =
+      Quic_api->ConfigurationLoadCredential(configuration, &Config.CredConfig);
 
   if (status != QUIC_STATUS_SUCCESS) {
     printf("Failed to load Configuration.\n Make sure that in the folder cert/ "
