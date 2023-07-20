@@ -108,6 +108,9 @@ int main(int argc, char **argv) {
   QUIC_STATUS status;
   int err;
 
+  const char *Key = "../../cert/server.key";
+  const char *Cert = "../../cert/server.cert";
+
   status = MsQuicOpen2(&Quic_api);
 
   if (status != QUIC_STATUS_SUCCESS) {
@@ -143,6 +146,22 @@ int main(int argc, char **argv) {
 
   if (status != QUIC_STATUS_SUCCESS) {
     printf("Failed to make QUIC_Configuration.\n");
+    err = 2;
+    goto Error;
+  }
+
+  QUIC_CREDENTIAL_CONFIG Config;
+  memset(&Config, 0, sizeof(Config));
+  Config.Flags = QUIC_CREDENTIAL_FLAG_NONE;
+  Config.CertificateFile->CertificateFile = (char *)Cert;
+  Config.CertificateFile->PrivateKeyFile = (char *)Key;
+  Config.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+
+  status = Quic_api->ConfigurationLoadCredential(configuration, &Config);
+
+  if (status != QUIC_STATUS_SUCCESS) {
+    printf("Failed to load Configuration.\n Make sure that in the folder cert/ "
+           "there is both files server.key and server.cert");
     err = 2;
     goto Error;
   }
