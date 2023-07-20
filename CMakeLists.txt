@@ -33,7 +33,7 @@ set(SOURCES2
     sample/sample.c
 )
 
-#Server
+#===========Server==========
 add_executable(q_server ${SOURCES0})
 
 set_target_properties(q_server PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SRC_OUTPUT_DIRECTORY})
@@ -41,7 +41,7 @@ set_target_properties(q_server PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SRC_OUTPUT_
 # Include the msquic library header file directory
 target_include_directories(q_server PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/src/inc)
 
-#Client
+#==========Client==========
 add_executable(q_client ${SOURCES1})
 
 set_target_properties(q_client PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SRC_OUTPUT_DIRECTORY})
