@@ -1,6 +1,6 @@
 # Documentation for Certificate
 
-To run the microsoft sample you need to create a key and a certificate for TLS.
+To run the microsoft sample you need to create a key and a certificate for the server.
 
 ## To create 
 
