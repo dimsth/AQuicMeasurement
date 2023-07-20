@@ -10,4 +10,4 @@ Run:
 openssl req -nodes -new -x509 -keyout server.key -out server.cert
 ```
 
-And answer few of those question or "." for blank answer.
+And answer the question or answer "." to let them blank.
