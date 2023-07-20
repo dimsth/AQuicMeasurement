@@ -8,6 +8,12 @@ set(SAMPLE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/sample)
 include_directories(
     ${CMAKE_SOURCE_DIR}/../msquic/src/inc/
 )
+
+# Set the build type to Release if not specified
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Debug)
+endif()
+
 # Remove all files from the build folder
 file(GLOB files_to_remove ${CMAKE_BINARY_DIR}/*)
 foreach(file ${files_to_remove})
@@ -30,7 +36,7 @@ set(SOURCES1
 
 # Sources for sample
 set(SOURCES2
-    sample/sample.c
+    ms_sample/ms_sample.c
 )
 
 #===========Server==========
@@ -63,6 +69,12 @@ target_link_libraries(q_server PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/build/bin/R
 target_link_libraries(q_client PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/build/bin/Release/libmsquic.so.2.3.0)
 target_link_libraries(ms_sample PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/build/bin/Release/libmsquic.so.2.3.0)
 
-target_compile_options(q_server PRIVATE -g)
-target_compile_options(q_client PRIVATE -g)
-target_compile_options(ms_sample PRIVATE -g)
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  target_compile_options(q_server PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
+  target_compile_options(q_client PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
+  target_compile_options(ms_sample PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
+else()
+  target_compile_options(q_server PRIVATE -g -Wall -Wextra -pedantic)
+  target_compile_options(q_client PRIVATE -g -Wall -Wextra -pedantic)
+  target_compile_options(ms_sample PRIVATE -g -Wall -Wextra -pedantic)
+endif()
