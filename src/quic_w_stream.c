@@ -1,5 +1,6 @@
 #include "msquic.h"
 #include <arpa/inet.h>
+#include <msquic_posix.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -490,7 +491,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   return QUIC_STATUS_SUCCESS;
 }
 
-void ClientSend(_In_ HQUIC Connection) {
+void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
   QUIC_STATUS Status;
   HQUIC Stream = NULL;
   uint8_t *SendBufferRaw;
@@ -540,9 +541,17 @@ void ClientSend(_In_ HQUIC Connection) {
   // the buffer. This indicates this is the last buffer on the stream and the
   // the stream is shut down (in the send direction) immediately after.
   //
-  if (QUIC_FAILED(Status =
-                      QuicApi->StreamSend(Stream, SendBuffer, 1,
-                                          QUIC_SEND_FLAG_NONE, SendBuffer))) {
+  if (msgs_num == 0)
+    Status = QuicApi->StreamSend(Stream, SendBuffer, 1,
+                                 QUIC_SEND_FLAG_ALLOW_0_RTT, SendBuffer);
+  else if (msgs_num == num_of_msgs - 1)
+    Status = QuicApi->StreamSend(Stream, SendBuffer, 1, QUIC_SEND_FLAG_FIN,
+                                 SendBuffer);
+  else
+    Status = QuicApi->StreamSend(Stream, SendBuffer, 1, QUIC_SEND_FLAG_NONE,
+                                 SendBuffer);
+
+  if (QUIC_FAILED(Status)) {
     printf("StreamSend failed, 0x%x!\n", Status);
     free(SendBufferRaw);
     goto Error;
