@@ -540,8 +540,9 @@ void ClientSend(_In_ HQUIC Connection) {
   // the buffer. This indicates this is the last buffer on the stream and the
   // the stream is shut down (in the send direction) immediately after.
   //
-  if (QUIC_FAILED(Status = QuicApi->StreamSend(
-                      Stream, SendBuffer, 1, QUIC_SEND_FLAG_FIN, SendBuffer))) {
+  if (QUIC_FAILED(Status =
+                      QuicApi->StreamSend(Stream, SendBuffer, 1,
+                                          QUIC_SEND_FLAG_NONE, SendBuffer))) {
     printf("StreamSend failed, 0x%x!\n", Status);
     free(SendBufferRaw);
     goto Error;
