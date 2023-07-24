@@ -687,22 +687,22 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   const char *ResumptionTicketString = NULL;
   HQUIC Connection = NULL;
 
-  /* const char *nom;
-   if ((nom = GetValue(argc, argv, "num_of_msgs")) == NULL) {
-     printf("Must specify '-num_of_msgs' argument!\n");
-     Status = QUIC_STATUS_INVALID_PARAMETER;
-     goto Error;
-   }
-   num_of_msgs = atoi(nom);
+  const char *nom;
+  if ((nom = GetValue(argc, argv, "num_of_msgs")) == NULL) {
+    printf("Must specify '-num_of_msgs' argument!\n");
+    Status = QUIC_STATUS_INVALID_PARAMETER;
+    goto Error;
+  }
+  num_of_msgs = atoi(nom);
 
-   const char *som;
-   if ((som = GetValue(argc, argv, "size_of_msgs")) == NULL) {
-     printf("Must specify '-num_of_msgs' argument!\n");
-     Status = QUIC_STATUS_INVALID_PARAMETER;
-     goto Error;
-   }
-   num_of_msgs = atoi(som);
- */
+  const char *som;
+  if ((som = GetValue(argc, argv, "size_of_msgs")) == NULL) {
+    printf("Must specify '-num_of_msgs' argument!\n");
+    Status = QUIC_STATUS_INVALID_PARAMETER;
+    goto Error;
+  }
+  num_of_msgs = atoi(som);
+
   //
   // Allocate a new connection object.
   //
