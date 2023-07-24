@@ -1,6 +1,6 @@
 # A Quic Measurement
 
-Simple C programs to make a Quic connection using the msquic library.
+C programs to make a Quic connection using the msquic library.
 https://github.com/microsoft/msquic
 
 ## Requirements
