@@ -26,12 +26,12 @@ endforeach()
 
 # Sources for server
 set(SOURCES0
-    src/quic_server.c
+    src/quic_w_stream.c
 )
 
 # Sources for client
 set(SOURCES1
-    src/quic_client.c
+  src/quic_w_datag.c
 )
 
 # Sources for sample
@@ -39,21 +39,21 @@ set(SOURCES2
     ms_sample/ms_sample.c
 )
 
-#===========Server==========
-add_executable(q_server ${SOURCES0})
+#===========Stream==========
+add_executable(q_stream ${SOURCES0})
 
-set_target_properties(q_server PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SRC_OUTPUT_DIRECTORY})
-
-# Include the msquic library header file directory
-target_include_directories(q_server PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/src/inc)
-
-#==========Client==========
-add_executable(q_client ${SOURCES1})
-
-set_target_properties(q_client PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SRC_OUTPUT_DIRECTORY})
+set_target_properties(q_stream PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SRC_OUTPUT_DIRECTORY})
 
 # Include the msquic library header file directory
-target_include_directories(q_client PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/src/inc)
+target_include_directories(q_stream PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/src/inc)
+
+#==========Datagram==========
+add_executable(q_datag ${SOURCES1})
+
+set_target_properties(q_datag PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SRC_OUTPUT_DIRECTORY})
+
+# Include the msquic library header file directory
+target_include_directories(q_datag PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/src/inc)
 
 #==========Sample===========
 add_executable(ms_sample ${SOURCES2})
@@ -65,16 +65,16 @@ target_include_directories(ms_sample PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/src/i
 # Link against the msquic library
 link_directories(${CMAKE_SOURCE_DIR}/../msquic/build/bin/Release)
 
-target_link_libraries(q_server PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/build/bin/Release/libmsquic.so.2.3.0)
-target_link_libraries(q_client PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/build/bin/Release/libmsquic.so.2.3.0)
+target_link_libraries(q_stream PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/build/bin/Release/libmsquic.so.2.3.0)
+target_link_libraries(q_datag PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/build/bin/Release/libmsquic.so.2.3.0)
 target_link_libraries(ms_sample PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/build/bin/Release/libmsquic.so.2.3.0)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
-  target_compile_options(q_server PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
-  target_compile_options(q_client PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
+  target_compile_options(q_stream PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
+  target_compile_options(q_datag PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
   target_compile_options(ms_sample PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
 else()
-  target_compile_options(q_server PRIVATE -g -Wall -Wextra -pedantic)
-  target_compile_options(q_client PRIVATE -g -Wall -Wextra -pedantic)
+  target_compile_options(q_stream PRIVATE -g -Wall -Wextra -pedantic)
+  target_compile_options(q_datag PRIVATE -g -Wall -Wextra -pedantic)
   target_compile_options(ms_sample PRIVATE -g -Wall -Wextra -pedantic)
 endif()
