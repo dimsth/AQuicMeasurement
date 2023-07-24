@@ -580,7 +580,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     printf("[conn][%p] Connected\n", Connection);
     for (int i = 0; i < num_of_msgs; i++)
-      ClientSend(Connection);
+      ClientSend(Connection, i);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
     //
