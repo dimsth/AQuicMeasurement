@@ -1,1 +1,3 @@
 build/
+cert/server.key
+cert/server.cert
