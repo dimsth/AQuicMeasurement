@@ -1,54 +1,6 @@
-/*++
-
-    Copyright (c) Microsoft Corporation.
-    Licensed under the MIT License.
-
-Abstract:
-
-    Provides a very simple MsQuic API sample server and client application.
-
-    The quicsample app implements a simple protocol (ALPN "sample") where the
-    client connects to the server, opens a single bidirectional stream, sends
-    some data and shuts down the stream in the send direction. On the server
-    side all connections, streams and data are accepted. After the stream is
-    shut down, the server then sends its own data and shuts down its send
-    direction. The connection only shuts down when the 1 second idle timeout
-    triggers.
-
-    A certificate needs to be available for the server to function.
-
-    On Windows, the following PowerShell command can be used to generate a self
-    signed certificate with the correct settings. This works for both Schannel
-    and OpenSSL TLS providers, assuming the KeyExportPolicy parameter is set to
-    Exportable. The Thumbprint received from the command is then passed to this
-    sample with -cert_hash:PASTE_THE_THUMBPRINT_HERE
-
-    New-SelfSignedCertificate -DnsName $env:computername,localhost -FriendlyName
-MsQuic-Test -KeyUsageProperty Sign -KeyUsage DigitalSignature -CertStoreLocation
-cert:\CurrentUser\My -HashAlgorithm SHA256 -Provider "Microsoft Software Key
-Storage Provider" -KeyExportPolicy Exportable
-
-    On Linux, the following command can be used to generate a self signed
-    certificate that works with the OpenSSL TLS Provider. This can also be used
-    for Windows OpenSSL, however we recommend the certificate store method above
-    for ease of use. Currently key files with password protections are not
-    supported. With these files, they can be passed to the sample with
-    -cert_file:path/to/server.cert -key_file path/to/server.key
-
-    openssl req  -nodes -new -x509  -keyout server.key -out server.cert
-
---*/
-
-#include <arpa/inet.h>
-#ifdef _WIN32
-//
-// The conformant preprocessor along with the newest SDK throws this warning for
-// a macro in C mode. As users might run into this exact bug, exclude this
-// warning here. This is not an MsQuic bug but a Windows SDK bug.
-//
-#pragma warning(disable : 5105)
-#endif
 #include "msquic.h"
+#include <arpa/inet.h>
+#include <msquic_posix.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -56,12 +8,14 @@ Storage Provider" -KeyExportPolicy Exportable
 #define UNREFERENCED_PARAMETER(P) (void)(P)
 #endif
 
+#define PORT 5678
+#define IDLE_TIMEOUT 1000
 //
 // The (optional) registration configuration for the app. This sets a name for
 // the app (used for persistent storage and for debugging). It also configures
 // the execution profile, using the default "low latency" profile.
 //
-const QUIC_REGISTRATION_CONFIG RegConfig = {"quicsample",
+const QUIC_REGISTRATION_CONFIG RegConfig = {"quic_datag",
                                             QUIC_EXECUTION_PROFILE_LOW_LATENCY};
 
 //
@@ -70,25 +24,14 @@ const QUIC_REGISTRATION_CONFIG RegConfig = {"quicsample",
 const QUIC_BUFFER Alpn = {sizeof("sample") - 1, (uint8_t *)"sample"};
 
 //
-// The UDP port used by the server side of the protocol.
-//
-const uint16_t UdpPort = 4567;
-
-//
-// The default idle timeout period (1 second) used for the protocol.
-//
-const uint64_t IdleTimeoutMs = 1000;
-
-//
 // The length of buffer sent over the streams in the protocol.
 //
-const uint32_t SendBufferLength = 100;
 
 //
 // The QUIC API/function table returned from MsQuicOpen2. It contains all the
 // functions called by the app to interact with MsQuic.
 //
-const QUIC_API_TABLE *MsQuic;
+const QUIC_API_TABLE *QuicApi;
 
 //
 // The QUIC handle to the registration object. This is the top level API object
@@ -104,17 +47,19 @@ HQUIC Registration;
 //
 HQUIC Configuration;
 
+unsigned int num_of_msgs = 0;
+
+unsigned int size_of_msgs = 0;
+
 void PrintUsage() {
   printf("\n"
-         "quicsample runs a simple client or server.\n"
+         "quic connection using datagram runs client or server.\n"
          "\n"
          "Usage:\n"
          "\n"
-         "  quicsample.exe -client -unsecure -target:{IPAddress|Hostname} "
-         "[-ticket:<ticket>]\n"
-         "  quicsample.exe -server -cert_hash:<...>\n"
-         "  quicsample.exe -server -cert_file:<...> -key_file:<...> "
-         "[-password:<...>]\n");
+         "  ./q_datag -client -unsecure -target:{IPAddress} "
+         "-num_of_msgs:{Number} -size_of_msgs:{Number}\n"
+         "  ./q_datag -server -cert_file:<...> -key_file:<...> \n");
 }
 
 //
@@ -186,15 +131,15 @@ void ServerSend(_In_ HQUIC Stream) {
   //
   // Allocates and builds the buffer to send over the stream.
   //
-  void *SendBufferRaw = malloc(sizeof(QUIC_BUFFER) + SendBufferLength);
+  void *SendBufferRaw = malloc(sizeof(QUIC_BUFFER) + size_of_msgs);
   if (SendBufferRaw == NULL) {
     printf("SendBuffer allocation failed!\n");
-    MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+    QuicApi->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
     return;
   }
   QUIC_BUFFER *SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
   SendBuffer->Buffer = (uint8_t *)SendBufferRaw + sizeof(QUIC_BUFFER);
-  SendBuffer->Length = SendBufferLength;
+  SendBuffer->Length = size_of_msgs;
 
   printf("[strm][%p] Sending data...\n", Stream);
 
@@ -204,11 +149,11 @@ void ServerSend(_In_ HQUIC Stream) {
   // the stream is shut down (in the send direction) immediately after.
   //
   QUIC_STATUS Status;
-  if (QUIC_FAILED(Status = MsQuic->StreamSend(
+  if (QUIC_FAILED(Status = QuicApi->StreamSend(
                       Stream, SendBuffer, 1, QUIC_SEND_FLAG_FIN, SendBuffer))) {
     printf("StreamSend failed, 0x%x!\n", Status);
     free(SendBufferRaw);
-    MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+    QuicApi->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
   }
 }
 
@@ -247,7 +192,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The peer aborted its send direction of the stream.
     //
     printf("[strm][%p] Peer aborted\n", Stream);
-    MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+    QuicApi->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
     break;
   case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
     //
@@ -255,7 +200,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // with the stream. It can now be safely cleaned up.
     //
     printf("[strm][%p] All done\n", Stream);
-    MsQuic->StreamClose(Stream);
+    QuicApi->StreamClose(Stream);
     break;
   default:
     break;
@@ -277,7 +222,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The handshake has completed for the connection.
     //
     printf("[conn][%p] Connected\n", Connection);
-    MsQuic->ConnectionSendResumptionTicket(
+    QuicApi->ConnectionSendResumptionTicket(
         Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
@@ -307,7 +252,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // safely cleaned up.
     //
     printf("[conn][%p] All done\n", Connection);
-    MsQuic->ConnectionClose(Connection);
+    QuicApi->ConnectionClose(Connection);
     break;
   case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
     //
@@ -315,8 +260,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // callback handler before returning.
     //
     printf("[strm][%p] Peer started\n", Event->PEER_STREAM_STARTED.Stream);
-    MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
-                               (void *)ServerStreamCallback, NULL);
+    QuicApi->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
+                                (void *)ServerStreamCallback, NULL);
     break;
   case QUIC_CONNECTION_EVENT_RESUMED:
     //
@@ -348,9 +293,9 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
     // proceed, the server must provide a configuration for QUIC to use. The
     // app MUST set the callback handler before returning.
     //
-    MsQuic->SetCallbackHandler(Event->NEW_CONNECTION.Connection,
-                               (void *)ServerConnectionCallback, NULL);
-    Status = MsQuic->ConnectionSetConfiguration(
+    QuicApi->SetCallbackHandler(Event->NEW_CONNECTION.Connection,
+                                (void *)ServerConnectionCallback, NULL);
+    Status = QuicApi->ConnectionSetConfiguration(
         Event->NEW_CONNECTION.Connection, Configuration);
     break;
   default:
@@ -380,7 +325,7 @@ ServerLoadConfiguration(_In_ int argc,
   //
   // Configures the server's idle timeout.
   //
-  Settings.IdleTimeoutMs = IdleTimeoutMs;
+  Settings.IdleTimeoutMs = IDLE_TIMEOUT;
   Settings.IsSet.IdleTimeoutMs = TRUE;
   //
   // Configures the server's resumption level to allow for resumption and
@@ -402,41 +347,19 @@ ServerLoadConfiguration(_In_ int argc,
 
   const char *Cert;
   const char *KeyFile;
-  if ((Cert = GetValue(argc, argv, "cert_hash")) != NULL) {
-    //
-    // Load the server's certificate from the default certificate store,
-    // using the provided certificate hash.
-    //
-    uint32_t CertHashLen = DecodeHexBuffer(
-        Cert, sizeof(Config.CertHash.ShaHash), Config.CertHash.ShaHash);
-    if (CertHashLen != sizeof(Config.CertHash.ShaHash)) {
-      return FALSE;
-    }
-    Config.CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_HASH;
-    Config.CredConfig.CertificateHash = &Config.CertHash;
 
-  } else if ((Cert = GetValue(argc, argv, "cert_file")) != NULL &&
-             (KeyFile = GetValue(argc, argv, "key_file")) != NULL) {
+  if ((Cert = GetValue(argc, argv, "cert_file")) != NULL &&
+      (KeyFile = GetValue(argc, argv, "key_file")) != NULL) {
     //
     // Loads the server's certificate from the file.
     //
-    const char *Password = GetValue(argc, argv, "password");
-    if (Password != NULL) {
-      Config.CertFileProtected.CertificateFile = (char *)Cert;
-      Config.CertFileProtected.PrivateKeyFile = (char *)KeyFile;
-      Config.CertFileProtected.PrivateKeyPassword = (char *)Password;
-      Config.CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE_PROTECTED;
-      Config.CredConfig.CertificateFileProtected = &Config.CertFileProtected;
-    } else {
-      Config.CertFile.CertificateFile = (char *)Cert;
-      Config.CertFile.PrivateKeyFile = (char *)KeyFile;
-      Config.CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
-      Config.CredConfig.CertificateFile = &Config.CertFile;
-    }
+    Config.CertFile.CertificateFile = (char *)Cert;
+    Config.CertFile.PrivateKeyFile = (char *)KeyFile;
+    Config.CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_FILE;
+    Config.CredConfig.CertificateFile = &Config.CertFile;
 
   } else {
-    printf("Must specify ['-cert_hash'] or ['cert_file' and 'key_file' (and "
-           "optionally 'password')]!\n");
+    printf("Must specify ['cert_file' and 'key_file']\n");
     return FALSE;
   }
 
@@ -445,7 +368,7 @@ ServerLoadConfiguration(_In_ int argc,
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
+  if (QUIC_FAILED(Status = QuicApi->ConfigurationOpen(
                       Registration, &Alpn, 1, &Settings, sizeof(Settings), NULL,
                       &Configuration))) {
     printf("ConfigurationOpen failed, 0x%x!\n", Status);
@@ -455,7 +378,7 @@ ServerLoadConfiguration(_In_ int argc,
   //
   // Loads the TLS credential part of the configuration.
   //
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
+  if (QUIC_FAILED(Status = QuicApi->ConfigurationLoadCredential(
                       Configuration, &Config.CredConfig))) {
     printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
     return FALSE;
@@ -477,7 +400,7 @@ void RunServer(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   //
   QUIC_ADDR Address = {0};
   Address.Ipv4.sin_family = QUIC_ADDRESS_FAMILY_UNSPEC;
-  Address.Ipv4.sin_port = htons(UdpPort);
+  Address.Ipv4.sin_port = htons(PORT);
 
   //
   // Load the server configuration based on the command line.
@@ -489,7 +412,7 @@ void RunServer(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   //
   // Create/allocate a new listener object.
   //
-  if (QUIC_FAILED(Status = MsQuic->ListenerOpen(
+  if (QUIC_FAILED(Status = QuicApi->ListenerOpen(
                       Registration, ServerListenerCallback, NULL, &Listener))) {
     printf("ListenerOpen failed, 0x%x!\n", Status);
     goto Error;
@@ -499,7 +422,7 @@ void RunServer(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   // Starts listening for incoming connections.
   //
   if (QUIC_FAILED(Status =
-                      MsQuic->ListenerStart(Listener, &Alpn, 1, &Address))) {
+                      QuicApi->ListenerStart(Listener, &Alpn, 1, &Address))) {
     printf("ListenerStart failed, 0x%x!\n", Status);
     goto Error;
   }
@@ -513,10 +436,10 @@ void RunServer(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
 Error:
 
   if (Listener != NULL) {
-    MsQuic->ListenerClose(Listener);
+    QuicApi->ListenerClose(Listener);
   }
 }
-
+//==================================================Client==================================================
 //
 // The clients's callback for stream events from MsQuic.
 //
@@ -559,7 +482,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     printf("[strm][%p] All done\n", Stream);
     if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
-      MsQuic->StreamClose(Stream);
+      QuicApi->StreamClose(Stream);
     }
     break;
   default:
@@ -568,7 +491,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   return QUIC_STATUS_SUCCESS;
 }
 
-void ClientSend(_In_ HQUIC Connection) {
+void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
   QUIC_STATUS Status;
   HQUIC Stream = NULL;
   uint8_t *SendBufferRaw;
@@ -579,8 +502,8 @@ void ClientSend(_In_ HQUIC Connection) {
   // and no QUIC stream identifier is assigned until it's started.
   //
   if (QUIC_FAILED(
-          Status = MsQuic->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE,
-                                      ClientStreamCallback, NULL, &Stream))) {
+          Status = QuicApi->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE,
+                                       ClientStreamCallback, NULL, &Stream))) {
     printf("StreamOpen failed, 0x%x!\n", Status);
     goto Error;
   }
@@ -592,16 +515,16 @@ void ClientSend(_In_ HQUIC Connection) {
   // the stream being started until data is sent on the stream.
   //
   if (QUIC_FAILED(
-          Status = MsQuic->StreamStart(Stream, QUIC_STREAM_START_FLAG_NONE))) {
+          Status = QuicApi->StreamStart(Stream, QUIC_STREAM_START_FLAG_NONE))) {
     printf("StreamStart failed, 0x%x!\n", Status);
-    MsQuic->StreamClose(Stream);
+    QuicApi->StreamClose(Stream);
     goto Error;
   }
 
   //
   // Allocates and builds the buffer to send over the stream.
   //
-  SendBufferRaw = (uint8_t *)malloc(sizeof(QUIC_BUFFER) + SendBufferLength);
+  SendBufferRaw = (uint8_t *)malloc(sizeof(QUIC_BUFFER) + size_of_msgs);
   if (SendBufferRaw == NULL) {
     printf("SendBuffer allocation failed!\n");
     Status = QUIC_STATUS_OUT_OF_MEMORY;
@@ -609,7 +532,7 @@ void ClientSend(_In_ HQUIC Connection) {
   }
   SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
   SendBuffer->Buffer = SendBufferRaw + sizeof(QUIC_BUFFER);
-  SendBuffer->Length = SendBufferLength;
+  SendBuffer->Length = size_of_msgs;
 
   printf("[strm][%p] Sending data...\n", Stream);
 
@@ -618,8 +541,17 @@ void ClientSend(_In_ HQUIC Connection) {
   // the buffer. This indicates this is the last buffer on the stream and the
   // the stream is shut down (in the send direction) immediately after.
   //
-  if (QUIC_FAILED(Status = MsQuic->StreamSend(
-                      Stream, SendBuffer, 1, QUIC_SEND_FLAG_FIN, SendBuffer))) {
+  if (msgs_num == 0)
+    Status = QuicApi->StreamSend(Stream, SendBuffer, 1,
+                                 QUIC_SEND_FLAG_ALLOW_0_RTT, SendBuffer);
+  else if (msgs_num == num_of_msgs - 1)
+    Status = QuicApi->StreamSend(Stream, SendBuffer, 1, QUIC_SEND_FLAG_FIN,
+                                 SendBuffer);
+  else
+    Status = QuicApi->StreamSend(Stream, SendBuffer, 1, QUIC_SEND_FLAG_NONE,
+                                 SendBuffer);
+
+  if (QUIC_FAILED(Status)) {
     printf("StreamSend failed, 0x%x!\n", Status);
     free(SendBufferRaw);
     goto Error;
@@ -628,8 +560,8 @@ void ClientSend(_In_ HQUIC Connection) {
 Error:
 
   if (QUIC_FAILED(Status)) {
-    MsQuic->ConnectionShutdown(Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                               0);
+    QuicApi->ConnectionShutdown(Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
+                                0);
   }
 }
 
@@ -647,7 +579,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The handshake has completed for the connection.
     //
     printf("[conn][%p] Connected\n", Connection);
-    ClientSend(Connection);
+    for (int i = 0; i < num_of_msgs; i++)
+      ClientSend(Connection, i);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
     //
@@ -677,7 +610,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     printf("[conn][%p] All done\n", Connection);
     if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
-      MsQuic->ConnectionClose(Connection);
+      QuicApi->ConnectionClose(Connection);
     }
     break;
   case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
@@ -709,7 +642,7 @@ ClientLoadConfiguration(BOOLEAN Unsecure) {
   //
   // Configures the client's idle timeout.
   //
-  Settings.IdleTimeoutMs = IdleTimeoutMs;
+  Settings.IdleTimeoutMs = IDLE_TIMEOUT;
   Settings.IsSet.IdleTimeoutMs = TRUE;
 
   //
@@ -729,7 +662,7 @@ ClientLoadConfiguration(BOOLEAN Unsecure) {
   // and settings.
   //
   QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
+  if (QUIC_FAILED(Status = QuicApi->ConfigurationOpen(
                       Registration, &Alpn, 1, &Settings, sizeof(Settings), NULL,
                       &Configuration))) {
     printf("ConfigurationOpen failed, 0x%x!\n", Status);
@@ -740,8 +673,8 @@ ClientLoadConfiguration(BOOLEAN Unsecure) {
   // Loads the TLS credential part of the configuration. This is required even
   // on client side, to indicate if a certificate is required or not.
   //
-  if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(Configuration,
-                                                               &CredConfig))) {
+  if (QUIC_FAILED(Status = QuicApi->ConfigurationLoadCredential(Configuration,
+                                                                &CredConfig))) {
     printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
     return FALSE;
   }
@@ -764,31 +697,30 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   const char *ResumptionTicketString = NULL;
   HQUIC Connection = NULL;
 
+  const char *nom;
+  if ((nom = GetValue(argc, argv, "num_of_msgs")) == NULL) {
+    printf("Must specify '-num_of_msgs' argument!\n");
+    Status = QUIC_STATUS_INVALID_PARAMETER;
+    goto Error;
+  }
+  num_of_msgs = atoi(nom);
+
+  const char *som;
+  if ((som = GetValue(argc, argv, "size_of_msgs")) == NULL) {
+    printf("Must specify '-size_of_msgs' argument!\n");
+    Status = QUIC_STATUS_INVALID_PARAMETER;
+    goto Error;
+  }
+  size_of_msgs = atoi(som);
+
   //
   // Allocate a new connection object.
   //
-  if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(Registration,
-                                                  ClientConnectionCallback,
-                                                  NULL, &Connection))) {
+  if (QUIC_FAILED(Status = QuicApi->ConnectionOpen(Registration,
+                                                   ClientConnectionCallback,
+                                                   NULL, &Connection))) {
     printf("ConnectionOpen failed, 0x%x!\n", Status);
     goto Error;
-  }
-
-  if ((ResumptionTicketString = GetValue(argc, argv, "ticket")) != NULL) {
-    //
-    // If provided at the command line, set the resumption ticket that can
-    // be used to resume a previous session.
-    //
-    uint8_t ResumptionTicket[10240];
-    uint16_t TicketLength = (uint16_t)DecodeHexBuffer(
-        ResumptionTicketString, sizeof(ResumptionTicket), ResumptionTicket);
-    if (QUIC_FAILED(Status = MsQuic->SetParam(
-                        Connection, QUIC_PARAM_CONN_RESUMPTION_TICKET,
-                        TicketLength, ResumptionTicket))) {
-      printf("SetParam(QUIC_PARAM_CONN_RESUMPTION_TICKET) failed, 0x%x!\n",
-             Status);
-      goto Error;
-    }
   }
 
   //
@@ -800,15 +732,14 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
     Status = QUIC_STATUS_INVALID_PARAMETER;
     goto Error;
   }
-
   printf("[conn][%p] Connecting...\n", Connection);
 
   //
   // Start the connection to the server.
   //
-  if (QUIC_FAILED(Status = MsQuic->ConnectionStart(Connection, Configuration,
-                                                   QUIC_ADDRESS_FAMILY_UNSPEC,
-                                                   Target, UdpPort))) {
+  if (QUIC_FAILED(Status = QuicApi->ConnectionStart(Connection, Configuration,
+                                                    QUIC_ADDRESS_FAMILY_UNSPEC,
+                                                    Target, PORT))) {
     printf("ConnectionStart failed, 0x%x!\n", Status);
     goto Error;
   }
@@ -816,7 +747,7 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
 Error:
 
   if (QUIC_FAILED(Status) && Connection != NULL) {
-    MsQuic->ConnectionClose(Connection);
+    QuicApi->ConnectionClose(Connection);
   }
 }
 
@@ -827,7 +758,7 @@ int QUIC_MAIN_EXPORT main(_In_ int argc,
   //
   // Open a handle to the library and get the API function table.
   //
-  if (QUIC_FAILED(Status = MsQuicOpen2(&MsQuic))) {
+  if (QUIC_FAILED(Status = MsQuicOpen2(&QuicApi))) {
     printf("MsQuicOpen2 failed, 0x%x!\n", Status);
     goto Error;
   }
@@ -836,7 +767,7 @@ int QUIC_MAIN_EXPORT main(_In_ int argc,
   // Create a registration for the app's connections.
   //
   if (QUIC_FAILED(Status =
-                      MsQuic->RegistrationOpen(&RegConfig, &Registration))) {
+                      QuicApi->RegistrationOpen(&RegConfig, &Registration))) {
     printf("RegistrationOpen failed, 0x%x!\n", Status);
     goto Error;
   }
@@ -853,18 +784,18 @@ int QUIC_MAIN_EXPORT main(_In_ int argc,
 
 Error:
 
-  if (MsQuic != NULL) {
+  if (QuicApi != NULL) {
     if (Configuration != NULL) {
-      MsQuic->ConfigurationClose(Configuration);
+      QuicApi->ConfigurationClose(Configuration);
     }
     if (Registration != NULL) {
       //
       // This will block until all outstanding child objects have been
       // closed.
       //
-      MsQuic->RegistrationClose(Registration);
+      QuicApi->RegistrationClose(Registration);
     }
-    MsQuicClose(MsQuic);
+    MsQuicClose(QuicApi);
   }
 
   return (int)Status;
