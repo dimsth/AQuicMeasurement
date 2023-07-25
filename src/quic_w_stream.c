@@ -53,13 +53,13 @@ unsigned int size_of_msgs = 0;
 
 void PrintUsage() {
   printf("\n"
-         "quicsample runs a simple client or server.\n"
+         "quic connection using streams runs client or server.\n"
          "\n"
          "Usage:\n"
          "\n"
-         "  quicsample.exe -client -unsecure -target:{IPAddress} "
+         "  ./q_stream -client -unsecure -target:{IPAddress} "
          "-num_of_msgs:{Number} -size_of_msgs:{Number}\n"
-         "  quicsample.exe -server -cert_file:<...> -key_file:<...> \n");
+         "  ./q_stream -server -cert_file:<...> -key_file:<...> \n");
 }
 
 //
