@@ -127,21 +127,21 @@ uint32_t DecodeHexBuffer(_In_z_ const char *HexBuffer,
 //
 // Allocates and sends some data over a QUIC stream.
 //
-void ServerSend(_In_ HQUIC Stream) {
+void ServerSend(_In_ HQUIC Connection) {
   //
   // Allocates and builds the buffer to send over the stream.
   //
   void *SendBufferRaw = malloc(sizeof(QUIC_BUFFER) + size_of_msgs);
   if (SendBufferRaw == NULL) {
     printf("SendBuffer allocation failed!\n");
-    QuicApi->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+    // QuicApi->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
     return;
   }
   QUIC_BUFFER *SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
   SendBuffer->Buffer = (uint8_t *)SendBufferRaw + sizeof(QUIC_BUFFER);
   SendBuffer->Length = size_of_msgs;
 
-  printf("[strm][%p] Sending data...\n", Stream);
+  printf("[strm][%p] Sending data...\n", Connection);
 
   //
   // Sends the buffer over the stream. Note the FIN flag is passed along with
@@ -149,18 +149,19 @@ void ServerSend(_In_ HQUIC Stream) {
   // the stream is shut down (in the send direction) immediately after.
   //
   QUIC_STATUS Status;
-  if (QUIC_FAILED(Status = QuicApi->StreamSend(
-                      Stream, SendBuffer, 1, QUIC_SEND_FLAG_FIN, SendBuffer))) {
-    printf("StreamSend failed, 0x%x!\n", Status);
+  if (QUIC_FAILED(Status =
+                      QuicApi->DatagramSend(Connection, SendBuffer, 1,
+                                            QUIC_SEND_FLAG_FIN, SendBuffer))) {
+    printf("DatagSend failed, 0x%x!\n", Status);
     free(SendBufferRaw);
-    QuicApi->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+    // QuicApi->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
   }
 }
 
 //
 // The server's callback for stream events from MsQuic.
 //
-_IRQL_requires_max_(DISPATCH_LEVEL)
+/*_IRQL_requires_max_(DISPATCH_LEVEL)
     _Function_class_(QUIC_STREAM_CALLBACK) QUIC_STATUS QUIC_API
     ServerStreamCallback(_In_ HQUIC Stream, _In_opt_ void *Context,
                          _Inout_ QUIC_STREAM_EVENT *Event) {
@@ -206,7 +207,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     break;
   }
   return QUIC_STATUS_SUCCESS;
-}
+}*/
 
 //
 // The server's callback for connection events from MsQuic.
@@ -224,6 +225,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     printf("[conn][%p] Connected\n", Connection);
     QuicApi->ConnectionSendResumptionTicket(
         Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
+    ServerSend(Connection);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
     //
@@ -254,15 +256,15 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     printf("[conn][%p] All done\n", Connection);
     QuicApi->ConnectionClose(Connection);
     break;
-  case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
-    //
-    // The peer has started/created a new stream. The app MUST set the
-    // callback handler before returning.
-    //
-    printf("[strm][%p] Peer started\n", Event->PEER_STREAM_STARTED.Stream);
-    QuicApi->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
-                                (void *)ServerStreamCallback, NULL);
-    break;
+    /* case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
+       //
+       // The peer has started/created a new stream. The app MUST set the
+       // callback handler before returning.
+       //
+       printf("[strm][%p] Peer started\n", Event->PEER_STREAM_STARTED.Stream);
+       QuicApi->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
+                                   (void *)ServerStreamCallback, NULL);
+       break;*/
   case QUIC_CONNECTION_EVENT_RESUMED:
     //
     // The connection succeeded in doing a TLS resumption of a previous
@@ -338,8 +340,10 @@ ServerLoadConfiguration(_In_ int argc,
   // bidirectional stream. By default connections are not configured to allow
   // any streams from the peer.
   //
-  Settings.PeerBidiStreamCount = 1;
-  Settings.IsSet.PeerBidiStreamCount = TRUE;
+  // Settings.PeerBidiStreamCount = 1;
+  // Settings.IsSet.PeerBidiStreamCount = TRUE;
+
+  Settings.DatagramReceiveEnabled = TRUE;
 
   QUIC_CREDENTIAL_CONFIG_HELPER Config;
   memset(&Config, 0, sizeof(Config));
@@ -443,7 +447,7 @@ Error:
 //
 // The clients's callback for stream events from MsQuic.
 //
-_IRQL_requires_max_(DISPATCH_LEVEL)
+/*_IRQL_requires_max_(DISPATCH_LEVEL)
     _Function_class_(QUIC_STREAM_CALLBACK) QUIC_STATUS QUIC_API
     ClientStreamCallback(_In_ HQUIC Stream, _In_opt_ void *Context,
                          _Inout_ QUIC_STREAM_EVENT *Event) {
@@ -489,11 +493,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     break;
   }
   return QUIC_STATUS_SUCCESS;
-}
+}*/
 
 void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
   QUIC_STATUS Status;
-  HQUIC Stream = NULL;
+  // HQUIC Stream = NULL;
   uint8_t *SendBufferRaw;
   QUIC_BUFFER *SendBuffer;
 
@@ -501,7 +505,7 @@ void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
   // Create/allocate a new bidirectional stream. The stream is just allocated
   // and no QUIC stream identifier is assigned until it's started.
   //
-  if (QUIC_FAILED(
+  /*if (QUIC_FAILED(
           Status = QuicApi->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE,
                                        ClientStreamCallback, NULL, &Stream))) {
     printf("StreamOpen failed, 0x%x!\n", Status);
@@ -509,18 +513,18 @@ void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
   }
 
   printf("[strm][%p] Starting...\n", Stream);
-
+*/
   //
   // Starts the bidirectional stream. By default, the peer is not notified of
   // the stream being started until data is sent on the stream.
   //
-  if (QUIC_FAILED(
-          Status = QuicApi->StreamStart(Stream, QUIC_STREAM_START_FLAG_NONE))) {
-    printf("StreamStart failed, 0x%x!\n", Status);
-    QuicApi->StreamClose(Stream);
-    goto Error;
-  }
-
+  /*  if (QUIC_FAILED(
+            Status = QuicApi->StreamStart(Stream, QUIC_STREAM_START_FLAG_NONE)))
+    { printf("StreamStart failed, 0x%x!\n", Status);
+      QuicApi->StreamClose(Stream);
+      goto Error;
+    }
+  */
   //
   // Allocates and builds the buffer to send over the stream.
   //
@@ -534,7 +538,7 @@ void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
   SendBuffer->Buffer = SendBufferRaw + sizeof(QUIC_BUFFER);
   SendBuffer->Length = size_of_msgs;
 
-  printf("[strm][%p] Sending data...\n", Stream);
+  printf("[strm][%p] Sending data...\n", Connection);
 
   //
   // Sends the buffer over the stream. Note the FIN flag is passed along with
@@ -542,17 +546,17 @@ void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
   // the stream is shut down (in the send direction) immediately after.
   //
   if (msgs_num == 0)
-    Status = QuicApi->StreamSend(Stream, SendBuffer, 1,
-                                 QUIC_SEND_FLAG_ALLOW_0_RTT, SendBuffer);
+    Status = QuicApi->DatagramSend(Connection, SendBuffer, 1,
+                                   QUIC_SEND_FLAG_ALLOW_0_RTT, SendBuffer);
   else if (msgs_num == num_of_msgs - 1)
-    Status = QuicApi->StreamSend(Stream, SendBuffer, 1, QUIC_SEND_FLAG_FIN,
-                                 SendBuffer);
+    Status = QuicApi->DatagramSend(Connection, SendBuffer, 1,
+                                   QUIC_SEND_FLAG_FIN, SendBuffer);
   else
-    Status = QuicApi->StreamSend(Stream, SendBuffer, 1, QUIC_SEND_FLAG_NONE,
-                                 SendBuffer);
+    Status = QuicApi->DatagramSend(Connection, SendBuffer, 1,
+                                   QUIC_SEND_FLAG_NONE, SendBuffer);
 
   if (QUIC_FAILED(Status)) {
-    printf("StreamSend failed, 0x%x!\n", Status);
+    printf("DatagramSend failed, 0x%x!\n", Status);
     free(SendBufferRaw);
     goto Error;
   }
