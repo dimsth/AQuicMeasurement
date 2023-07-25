@@ -225,7 +225,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     printf("[conn][%p] Connected\n", Connection);
     QuicApi->ConnectionSendResumptionTicket(
         Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
-    ServerSend(Connection);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
     //
@@ -271,6 +270,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // connection's session.
     //
     printf("[conn][%p] Connection resumed!\n", Connection);
+    break;
+  case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:
+    printf("Message received. Answering back.\n");
+    ServerSend(Connection);
     break;
   default:
     break;
@@ -630,6 +633,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
              (uint8_t)Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket[i]);
     }
     printf("\n");
+    break;
+  case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:
+    printf("Message received.\n");
     break;
   default:
     break;
