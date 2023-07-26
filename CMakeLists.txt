@@ -24,12 +24,12 @@ foreach(file ${files_to_remove})
     endif()
 endforeach()
 
-# Sources for server
+# Sources for quic w/ stream
 set(SOURCES0
     src/quic_w_stream.c
 )
 
-# Sources for client
+# Sources for quic w/ datagram
 set(SOURCES1
   src/quic_w_datag.c
 )
@@ -37,6 +37,11 @@ set(SOURCES1
 # Sources for sample
 set(SOURCES2
     ms_sample/ms_sample.c
+)
+
+# Sources for TCP/IP
+set(SOURCES2
+    src/tcp_conn.c
 )
 
 #===========Stream==========
@@ -62,6 +67,11 @@ set_target_properties(ms_sample PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SAMPLE_OUT
 
 target_include_directories(ms_sample PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/src/inc)
 
+#==========TCP/IP===========
+add_executable(tcp_conn ${SOURCES2})
+
+set_target_properties(tcp_conn PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SRC_OUTPUT_DIRECTORY})
+
 # Link against the msquic library
 link_directories(${CMAKE_SOURCE_DIR}/../msquic/build/bin/Release)
 
@@ -73,8 +83,10 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_compile_options(q_stream PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
   target_compile_options(q_datag PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
   target_compile_options(ms_sample PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
+  target_compile_options(tcp_conn PRIVATE -funit-at-a-time -O2 -finline-functions -DNDEBUG)
 else()
   target_compile_options(q_stream PRIVATE -g -Wall -Wextra -pedantic)
   target_compile_options(q_datag PRIVATE -g -Wall -Wextra -pedantic)
   target_compile_options(ms_sample PRIVATE -g -Wall -Wextra -pedantic)
+  target_compile_options(tcp_conn PRIVATE -g -Wall -Wextra -pedantic)
 endif()
