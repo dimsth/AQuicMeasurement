@@ -86,18 +86,18 @@ void RunServer(int argc, char *argv[], int socket_desc) {
   // Listen
   listen(socket_desc, 1);
 
+  printf("Waiting for incoming connections...\n");
+  clientLen = sizeof(struct sockaddr_in);
+  // accept connection from an incoming client
+  sock =
+      accept(socket_desc, (struct sockaddr *)&client, (socklen_t *)&clientLen);
+  if (sock < 0) {
+    perror("accept failed");
+    goto Error;
+  }
+  printf("Connection accepted\n");
   // Accept and incoming connection
   while (1) {
-    printf("Waiting for incoming connections...\n");
-    clientLen = sizeof(struct sockaddr_in);
-    // accept connection from an incoming client
-    sock = accept(socket_desc, (struct sockaddr *)&client,
-                  (socklen_t *)&clientLen);
-    if (sock < 0) {
-      perror("accept failed");
-      goto Error;
-    }
-    printf("Connection accepted\n");
     memset(client_message, '\0', sizeof client_message);
     memset(message, '\0', sizeof message);
     // Receive a reply from the client
@@ -117,11 +117,11 @@ void RunServer(int argc, char *argv[], int socket_desc) {
       goto Error;
     }
 
-    close(sock);
     sleep(1);
   }
 Error:
 
+  close(sock);
   printf("Error occured!");
 }
 //============================Client============================
@@ -169,11 +169,25 @@ int SocketReceive(int hSocket, char *Rsp, short RvcSize) {
 }
 
 void RunClient(int argc, char *argv[], int hSocket) {
+  const char *nom;
+  if ((nom = GetValue(argc, argv, "num_of_msgs")) == NULL) {
+    printf("Must specify '-num_of_msgs' argument!\n");
+    goto Error;
+  }
+  num_of_msgs = atoi(nom);
+
+  const char *som;
+  if ((som = GetValue(argc, argv, "size_of_msgs")) == NULL) {
+    printf("Must specify '-size_of_msgs' argument!\n");
+    goto Error;
+  }
+  size_of_msgs = atoi(som);
+
   int read_size;
   struct sockaddr_in server;
   char *Buffer = calloc(size_of_msgs, sizeof(char));
   for (int i = 0; i < size_of_msgs; i++)
-    Buffer[i] = 91;
+    Buffer[i] = 90;
 
   const char *Target;
   if ((Target = GetValue(argc, argv, "target")) == NULL) {
@@ -188,19 +202,25 @@ void RunClient(int argc, char *argv[], int hSocket) {
   }
   printf("Sucessfully conected with server\n");
 
-  printf("Enter the Message: ");
   for (int i = 0; i < num_of_msgs; i++) {
     // Send data to the server
-    SocketSend(hSocket, Buffer, strlen(Buffer));
+    if (SocketSend(hSocket, Buffer, strlen(Buffer)) < 0) {
+      printf("Send failed\n");
+      goto Error;
+    }
+
+    // Receive the data from the server
+    char response[200];
+    memset(response, '\0', sizeof(response));
+    if (SocketReceive(hSocket, response, sizeof(response) - 1) < 0) {
+      printf("Receive failed\n");
+      goto Error;
+    }
+
+    printf("Server Response: %s\n\n", response);
   }
-  // Received the data from the server
-  read_size = SocketReceive(hSocket, Buffer, 200);
-  printf("Server Response : %s\n\n", Buffer);
 Error:
   close(hSocket);
-  shutdown(hSocket, 0);
-  shutdown(hSocket, 1);
-  shutdown(hSocket, 2);
 }
 
 int main(int argc, char *argv[]) {
