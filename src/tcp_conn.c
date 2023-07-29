@@ -74,7 +74,8 @@ int BindCreatedSocket(int hSocket) {
 }
 
 void RunServer(int argc, char *argv[], int socket_desc) {
-  int sock, clientLen, read_size;
+  int sock;
+  int conn_count = 0;
   struct sockaddr_in server, client;
   char Buffer[MAX_BUFFER_SIZE];
   char *message;
@@ -91,7 +92,7 @@ void RunServer(int argc, char *argv[], int socket_desc) {
   listen(socket_desc, 1);
 
   printf("Waiting for incoming connections...\n");
-  clientLen = sizeof(struct sockaddr_in);
+  int clientLen = sizeof(struct sockaddr_in);
   // accept connection from an incoming client
   sock =
       accept(socket_desc, (struct sockaddr *)&client, (socklen_t *)&clientLen);
@@ -106,8 +107,11 @@ void RunServer(int argc, char *argv[], int socket_desc) {
     // Receive a reply from the client
     int ret = recv(sock, Buffer, sizeof(Buffer), 0);
     if (ret < 0) {
-      printf("recv failed");
-      break;
+      printf("Recv failed! \n");
+      goto Error;
+    } else if (ret == 0) {
+      printf("Client closed connection! \n");
+      goto Close_Sock;
     } else {
       num_of_msgs++;
       size_of_msgs += strlen(Buffer);
@@ -127,8 +131,9 @@ void RunServer(int argc, char *argv[], int socket_desc) {
   }
 
 Error:
-  close(sock);
   printf("Error occured!");
+Close_Sock:
+  close(sock);
 }
 //============================Client============================
 // try to connect with server
