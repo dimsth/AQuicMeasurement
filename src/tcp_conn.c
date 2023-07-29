@@ -6,12 +6,17 @@
 #include <unistd.h>
 
 #define PORT 5678
+#define KILO_NUM 1024
+#define MEGA_NUM (KILO_NUM * KILO_NUM)
+#define GIGA_NUM (MEGA_NUM * KILO_NUM)
+#define MAX_BUFFER_SIZE (8 * MEGA_NUM)
+#define TOTAL_IO (10 * GIGA_NUM)
 
 typedef enum { FALSE = 0, TRUE = 1 } BOOLEAN;
 
 unsigned int num_of_msgs = 0;
 
-unsigned int size_of_msgs = 0;
+long long int size_of_msgs = 0;
 
 void PrintUsage() {
   printf("\n"
@@ -71,9 +76,8 @@ int BindCreatedSocket(int hSocket) {
 void RunServer(int argc, char *argv[], int socket_desc) {
   int sock, clientLen, read_size;
   struct sockaddr_in server, client;
-  char client_message[200] = {0};
-  char message[100] = {0};
-  const char *pMessage = "hello aticleworld.com";
+  char Buffer[MAX_BUFFER_SIZE];
+  char *message;
 
   // Bind
   if (BindCreatedSocket(socket_desc) < 0) {
@@ -98,29 +102,31 @@ void RunServer(int argc, char *argv[], int socket_desc) {
   printf("Connection accepted\n");
   // Accept and incoming connection
   while (1) {
-    memset(client_message, '\0', sizeof client_message);
-    memset(message, '\0', sizeof message);
+    memset(Buffer, '\0', MAX_BUFFER_SIZE);
     // Receive a reply from the client
-    if (recv(sock, client_message, 200, 0) < 0) {
+    int ret = recv(sock, Buffer, sizeof(Buffer), 0);
+    if (ret < 0) {
       printf("recv failed");
       break;
-    }
-    printf("Client reply : %s\n", client_message);
-    if (strcmp(pMessage, client_message) == 0) {
-      strcpy(message, "Hi there !");
     } else {
-      strcpy(message, "Invalid Message !");
-    }
-    // Send some data
-    if (send(sock, message, strlen(message), 0) < 0) {
-      printf("Send failed");
-      goto Error;
+      num_of_msgs++;
+      size_of_msgs += strlen(Buffer);
     }
 
     sleep(1);
   }
-Error:
 
+  sprintf(message,
+          "Received total number of msgs: %d \n Received total size of msgs: "
+          "%lld \n",
+          num_of_msgs, size_of_msgs);
+  // Send some data
+  if (send(sock, message, strlen(message), 0) < 0) {
+    printf("Send failed");
+    goto Error;
+  }
+
+Error:
   close(sock);
   printf("Error occured!");
 }
