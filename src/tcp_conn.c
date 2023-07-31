@@ -14,6 +14,8 @@
 
 typedef enum { FALSE = 0, TRUE = 1 } BOOLEAN;
 
+char *final_msg = "Closing Socket!";
+
 unsigned int num_of_msgs = 0;
 
 long long int size_of_msgs = 0;
@@ -105,16 +107,20 @@ void RunServer(int argc, char *argv[], int socket_desc) {
     memset(Buffer, '\0', MAX_BUFFER_SIZE);
 
     //  Receive a reply from the client
-    int ret = recv(sock, Buffer, sizeof(Buffer), 0);
+    int ret = recv(sock, Buffer, MAX_BUFFER_SIZE, 0);
     if (ret < 0) {
       printf("Recv failed! \n");
       goto Error;
     } else if (ret == 0) {
       printf("Client closed connection! \n");
       goto Close_Sock;
+    } else if (strncmp(Buffer, final_msg, 15) == 0) {
+      break;
     } else {
       num_of_msgs++;
       size_of_msgs += strlen(Buffer);
+      printf("------------\n Msg num: %d\n Total size: %lld\n", num_of_msgs,
+             size_of_msgs);
     }
 
     sleep(1);
@@ -220,16 +226,23 @@ void RunClient(int argc, char *argv[], int hSocket) {
       goto Error;
     }
 
-    // Receive the data from the server
-    char response[200];
-    memset(response, '\0', sizeof(response));
-    if (SocketReceive(hSocket, response, sizeof(response) - 1) < 0) {
-      printf("Receive failed\n");
-      goto Error;
-    }
-
-    printf("Server Response: %s\n\n", response);
+    sleep(1);
   }
+
+  if (SocketSend(hSocket, final_msg, strlen(final_msg)) < 0) {
+    printf("Send final message failed\n");
+    goto Error;
+  }
+
+  // Receive the data from the server
+  char response[200];
+  memset(response, '\0', sizeof(response));
+  if (SocketReceive(hSocket, response, sizeof(response) - 1) < 0) {
+    printf("Receive failed\n");
+    goto Error;
+  }
+
+  printf("Server Response: %s\n\n", response);
 Error:
   close(hSocket);
 }
