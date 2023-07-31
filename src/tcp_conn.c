@@ -8,8 +8,8 @@
 #define PORT 5678
 #define KILO_NUM 1024
 #define MEGA_NUM (KILO_NUM * KILO_NUM)
-#define GIGA_NUM (MEGA_NUM * KILO_NUM)
-#define MAX_BUFFER_SIZE (8 * MEGA_NUM)
+#define GIGA_NUM ((long long int)MEGA_NUM * KILO_NUM)
+#define MAX_BUFFER_SIZE (5 * MEGA_NUM)
 #define TOTAL_IO (10 * GIGA_NUM)
 
 typedef enum { FALSE = 0, TRUE = 1 } BOOLEAN;
@@ -26,7 +26,7 @@ void PrintUsage() {
          "\n"
          "  ./tcp_conn -client -target:{IPAddress} -num_of_msgs:{Number} "
          "-size_of_msgs:{Number}\n"
-         "  ./tcp_conn -server -cert_file:<...> -key_file:<...> \n");
+         "  ./tcp_conn -server \n");
 }
 
 //
@@ -76,7 +76,7 @@ int BindCreatedSocket(int hSocket) {
 void RunServer(int argc, char *argv[], int socket_desc) {
   int sock;
   int conn_count = 0;
-  struct sockaddr_in server, client;
+  struct sockaddr_in client;
   char Buffer[MAX_BUFFER_SIZE];
   char *message;
 
@@ -87,7 +87,6 @@ void RunServer(int argc, char *argv[], int socket_desc) {
     goto Error;
   }
   printf("bind done\n");
-
   // Listen
   listen(socket_desc, 1);
 
@@ -104,7 +103,8 @@ void RunServer(int argc, char *argv[], int socket_desc) {
   // Accept and incoming connection
   while (1) {
     memset(Buffer, '\0', MAX_BUFFER_SIZE);
-    // Receive a reply from the client
+
+    //  Receive a reply from the client
     int ret = recv(sock, Buffer, sizeof(Buffer), 0);
     if (ret < 0) {
       printf("Recv failed! \n");
@@ -235,9 +235,8 @@ Error:
 }
 
 int main(int argc, char *argv[]) {
-  int hSocket;
   // Create socket
-  hSocket = SocketCreate();
+  int hSocket = SocketCreate();
   if (hSocket == -1) {
     printf("Could not create socket\n");
     return -1;
