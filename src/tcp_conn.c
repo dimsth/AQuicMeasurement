@@ -80,7 +80,7 @@ void RunServer(int argc, char *argv[], int socket_desc) {
   int conn_count = 0;
   struct sockaddr_in client;
   char Buffer[MAX_BUFFER_SIZE];
-  char *message;
+  char message[100];
 
   // Bind
   if (BindCreatedSocket(socket_desc) < 0) {
@@ -115,6 +115,7 @@ void RunServer(int argc, char *argv[], int socket_desc) {
       printf("Client closed connection! \n");
       goto Close_Sock;
     } else if (strncmp(Buffer, final_msg, 15) == 0) {
+      printf("Final message came!\n");
       break;
     } else {
       num_of_msgs++;
@@ -181,7 +182,7 @@ int SocketReceive(int hSocket, char *Rsp, short RvcSize) {
     return -1;
   }
   shortRetval = recv(hSocket, Rsp, RvcSize, 0);
-  printf("Response %s\n", Rsp);
+  printf("Server Response: %s\n", Rsp);
   return shortRetval;
 }
 
@@ -242,7 +243,6 @@ void RunClient(int argc, char *argv[], int hSocket) {
     goto Error;
   }
 
-  printf("Server Response: %s\n\n", response);
 Error:
   close(hSocket);
 }
