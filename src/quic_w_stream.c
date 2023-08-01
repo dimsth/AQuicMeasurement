@@ -539,8 +539,15 @@ void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
 
     printf("[%d] Sending data...\n", msgs_num);
   } else {
+    SendBufferRaw = (uint8_t *)malloc(sizeof(QUIC_BUFFER) + size_of_msgs);
+    if (SendBufferRaw == NULL) {
+      printf("SendBuffer allocation failed!\n");
+      Status = QUIC_STATUS_OUT_OF_MEMORY;
+      goto Error;
+    }
+
+    SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
     SendBuffer->Length = strlen(final_msg);
-    SendBuffer->Buffer = malloc(SendBuffer->Length);
     strcpy((char *)SendBuffer->Buffer, final_msg);
   }
   //
