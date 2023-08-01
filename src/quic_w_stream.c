@@ -222,8 +222,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The handshake has completed for the connection.
     //
     printf("[conn][%p] Connected\n", Connection);
-    QuicApi->ConnectionSendResumptionTicket(
-        Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
     //
@@ -610,20 +608,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       QuicApi->ConnectionClose(Connection);
     }
     break;
-  case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
-    //
-    // A resumption ticket (also called New Session Ticket or NST) was
-    // received from the server.
-    //
-    printf("[conn][%p] Resumption ticket received (%u bytes):\n", Connection,
-           Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
-    for (uint32_t i = 0;
-         i < Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength; i++) {
-      printf("%.2X",
-             (uint8_t)Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicket[i]);
-    }
-    printf("\n");
-    break;
   default:
     break;
   }
@@ -691,7 +675,6 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   }
 
   QUIC_STATUS Status;
-  const char *ResumptionTicketString = NULL;
   HQUIC Connection = NULL;
 
   const char *nom;
