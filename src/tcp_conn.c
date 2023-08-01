@@ -8,9 +8,7 @@
 #define PORT 5678
 #define KILO_NUM 1024
 #define MEGA_NUM (KILO_NUM * KILO_NUM)
-#define GIGA_NUM ((long long int)MEGA_NUM * KILO_NUM)
 #define MAX_BUFFER_SIZE (5 * MEGA_NUM)
-#define TOTAL_IO (10 * GIGA_NUM)
 
 typedef enum { FALSE = 0, TRUE = 1 } BOOLEAN;
 
@@ -120,8 +118,6 @@ void RunServer(int argc, char *argv[], int socket_desc) {
     } else {
       num_of_msgs++;
       size_of_msgs += strlen(Buffer);
-      printf("------------\n Msg num: %d\n Total size: %lld\n", num_of_msgs,
-             size_of_msgs);
     }
 
     sleep(1);
@@ -131,6 +127,7 @@ void RunServer(int argc, char *argv[], int socket_desc) {
           "Received total number of msgs: %d \n Received total size of msgs: "
           "%lld \n",
           num_of_msgs, size_of_msgs);
+  printf("%s", message);
   // Send some data
   if (send(sock, message, strlen(message), 0) < 0) {
     printf("Send failed");
