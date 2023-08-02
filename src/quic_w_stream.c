@@ -547,8 +547,9 @@ void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
     }
 
     SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
-    SendBuffer->Length = strlen(final_msg);
-    strcpy((char *)SendBuffer->Buffer, final_msg);
+    SendBuffer->Length = strlen(final_msg) + 1;
+    SendBuffer->Buffer = malloc(SendBuffer->Length);
+    memcpy(SendBuffer->Buffer, final_msg, SendBuffer->Length);
   }
   //
   // Sends the buffer over the stream. Note the FIN flag is passed along with
@@ -594,7 +595,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     printf("Start sending messages!\n");
     for (int i = 0; i < num_of_msgs; i++) {
       ClientSend(Connection, i);
-      sleep(1);
     }
 
     printf("Sending final message!\n");
