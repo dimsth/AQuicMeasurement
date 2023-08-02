@@ -459,7 +459,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // returned back to the app.
     //
     free(Event->SEND_COMPLETE.ClientContext);
-    printf("[strm] Data sent\n");
     break;
   case QUIC_STREAM_EVENT_RECEIVE:
     //
@@ -495,33 +494,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
   return QUIC_STATUS_SUCCESS;
 }
 
-void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
+int ClientSend(_In_ HQUIC Stream, _In_ int msgs_num) {
   QUIC_STATUS Status;
-  HQUIC Stream = NULL;
   uint8_t *SendBufferRaw;
   QUIC_BUFFER *SendBuffer;
-
-  //
-  // Create/allocate a new bidirectional stream. The stream is just allocated
-  // and no QUIC stream identifier is assigned until it's started.
-  //
-  if (QUIC_FAILED(
-          Status = QuicApi->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE,
-                                       ClientStreamCallback, NULL, &Stream))) {
-    printf("StreamOpen failed, 0x%x!\n", Status);
-    goto Error;
-  }
-
-  //
-  // Starts the bidirectional stream. By default, the peer is not notified of
-  // the stream being started until data is sent on the stream.
-  //
-  if (QUIC_FAILED(
-          Status = QuicApi->StreamStart(Stream, QUIC_STREAM_START_FLAG_NONE))) {
-    printf("StreamStart failed, 0x%x!\n", Status);
-    QuicApi->StreamClose(Stream);
-    goto Error;
-  }
 
   //
   // Allocates and builds the buffer to send over the stream.
@@ -531,7 +507,7 @@ void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
     if (SendBufferRaw == NULL) {
       printf("SendBuffer allocation failed!\n");
       Status = QUIC_STATUS_OUT_OF_MEMORY;
-      goto Error;
+      return FALSE;
     }
     SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
     SendBuffer->Buffer = SendBufferRaw + sizeof(QUIC_BUFFER);
@@ -543,7 +519,7 @@ void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
     if (SendBufferRaw == NULL) {
       printf("SendBuffer allocation failed!\n");
       Status = QUIC_STATUS_OUT_OF_MEMORY;
-      goto Error;
+      return FALSE;
     }
 
     SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
@@ -566,15 +542,9 @@ void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
                                                send_flags, SendBuffer))) {
     printf("StreamSend failed, 0x%x!\n", Status);
     free(SendBufferRaw);
-    goto Error;
+    return FALSE;
   }
-
-Error:
-
-  if (QUIC_FAILED(Status)) {
-    QuicApi->ConnectionShutdown(Connection, QUIC_CONNECTION_SHUTDOWN_FLAG_NONE,
-                                0);
-  }
+  return TRUE;
 }
 
 //
@@ -585,8 +555,33 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     ClientConnectionCallback(_In_ HQUIC Connection, _In_opt_ void *Context,
                              _Inout_ QUIC_CONNECTION_EVENT *Event) {
   UNREFERENCED_PARAMETER(Context);
+  QUIC_STATUS Status;
+  HQUIC Stream = NULL;
   switch (Event->Type) {
   case QUIC_CONNECTION_EVENT_CONNECTED:
+
+    //
+    // Create/allocate a new bidirectional stream. The stream is just allocated
+    // and no QUIC stream identifier is assigned until it's started.
+    //
+    if (QUIC_FAILED(Status = QuicApi->StreamOpen(
+                        Connection, QUIC_STREAM_OPEN_FLAG_NONE,
+                        ClientStreamCallback, NULL, &Stream))) {
+      printf("StreamOpen failed, 0x%x!\n", Status);
+      goto Error;
+    }
+
+    //
+    // Starts the bidirectional stream. By default, the peer is not notified of
+    // the stream being started until data is sent on the stream.
+    //
+    if (QUIC_FAILED(Status = QuicApi->StreamStart(
+                        Stream, QUIC_STREAM_START_FLAG_NONE))) {
+      printf("StreamStart failed, 0x%x!\n", Status);
+      QuicApi->StreamClose(Stream);
+      goto Error;
+    }
+
     //
     // The handshake has completed for the connection.
     //
@@ -594,11 +589,17 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
     printf("Start sending messages!\n");
     for (int i = 0; i < num_of_msgs; i++) {
-      ClientSend(Connection, i);
+      ClientSend(Stream, i);
     }
 
     printf("Sending final message!\n");
-    ClientSend(Connection, -5);
+    ClientSend(Stream, -5);
+  Error:
+
+    if (QUIC_FAILED(Status)) {
+      QuicApi->ConnectionShutdown(Connection,
+                                  QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
+    }
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
     //
