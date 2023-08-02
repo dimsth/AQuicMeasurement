@@ -52,7 +52,7 @@ HQUIC Configuration;
 
 unsigned int num_of_msgs = 0;
 
-unsigned int size_of_msgs = 0;
+long long int size_of_msgs = 0;
 
 char *final_msg = "Closing Socket!";
 
@@ -133,6 +133,12 @@ uint32_t DecodeHexBuffer(_In_z_ const char *HexBuffer,
 // Allocates and sends some data over a QUIC stream.
 //
 void ServerSend(_In_ HQUIC Stream) {
+  char message[100];
+  sprintf(message,
+          "Received total number of msgs: %d \n Received total size of msgs: "
+          "%lld \n",
+          num_of_msgs, size_of_msgs - 16);
+  printf("%s", message);
   //
   // Allocates and builds the buffer to send over the stream.
   //
@@ -143,8 +149,9 @@ void ServerSend(_In_ HQUIC Stream) {
     return;
   }
   QUIC_BUFFER *SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
-  SendBuffer->Buffer = (uint8_t *)SendBufferRaw + sizeof(QUIC_BUFFER);
-  SendBuffer->Length = size_of_msgs;
+  SendBuffer->Length = 100;
+  SendBuffer->Buffer = malloc(100);
+  memcpy(SendBuffer->Buffer, message, strlen(message));
 
   printf("[strm] Sending data...\n");
 
@@ -257,7 +264,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     printf("[conn] All done\n");
     QuicApi->ConnectionClose(Connection);
-    break;
+    exit(0);
   case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
     //
     // The peer has started/created a new stream. The app MUST set the
@@ -465,6 +472,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // Data was received from the peer on the stream.
     //
     printf("[strm] Data received\n");
+    printf("%s", Event->RECEIVE.Buffers->Buffer);
     break;
   case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
     //
@@ -510,8 +518,9 @@ int ClientSend(_In_ HQUIC Stream, _In_ int msgs_num) {
       return FALSE;
     }
     SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
-    SendBuffer->Buffer = SendBufferRaw + sizeof(QUIC_BUFFER);
     SendBuffer->Length = size_of_msgs;
+    SendBuffer->Buffer = malloc(SendBuffer->Length);
+    memset(SendBuffer->Buffer, 90, SendBuffer->Length);
 
     printf("[%d] Sending data...\n", msgs_num);
   } else {
@@ -590,6 +599,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     printf("Start sending messages!\n");
     for (int i = 0; i < num_of_msgs; i++) {
       ClientSend(Stream, i);
+
+      usleep(10000);
     }
 
     printf("Sending final message!\n");
