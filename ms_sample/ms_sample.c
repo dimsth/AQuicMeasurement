@@ -196,7 +196,7 @@ void ServerSend(_In_ HQUIC Stream) {
   SendBuffer->Buffer = (uint8_t *)SendBufferRaw + sizeof(QUIC_BUFFER);
   SendBuffer->Length = SendBufferLength;
 
-  printf("[strm][%p] Sending data...\n", Stream);
+  printf("[strm] Sending data...\n");
 
   //
   // Sends the buffer over the stream. Note the FIN flag is passed along with
@@ -227,26 +227,26 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // returned back to the app.
     //
     free(Event->SEND_COMPLETE.ClientContext);
-    printf("[strm][%p] Data sent\n", Stream);
+    printf("[strm] Data sent\n");
     break;
   case QUIC_STREAM_EVENT_RECEIVE:
     //
     // Data was received from the peer on the stream.
     //
-    printf("[strm][%p] Data received\n", Stream);
+    printf("[strm] Data received\n");
     break;
   case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
     //
     // The peer gracefully shut down its send direction of the stream.
     //
-    printf("[strm][%p] Peer shut down\n", Stream);
+    printf("[strm] Peer shut down\n");
     ServerSend(Stream);
     break;
   case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
     //
     // The peer aborted its send direction of the stream.
     //
-    printf("[strm][%p] Peer aborted\n", Stream);
+    printf("[strm] Peer aborted\n");
     MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
     break;
   case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
@@ -254,7 +254,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // Both directions of the stream have been shut down and MsQuic is done
     // with the stream. It can now be safely cleaned up.
     //
-    printf("[strm][%p] All done\n", Stream);
+    printf("[strm] All done\n");
     MsQuic->StreamClose(Stream);
     break;
   default:
@@ -276,7 +276,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     // The handshake has completed for the connection.
     //
-    printf("[conn][%p] Connected\n", Connection);
+    printf("[conn] Connected\n");
     MsQuic->ConnectionSendResumptionTicket(
         Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
     break;
@@ -288,9 +288,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     if (Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status ==
         QUIC_STATUS_CONNECTION_IDLE) {
-      printf("[conn][%p] Successfully shut down on idle.\n", Connection);
+      printf("[conn] Successfully shut down on idle.\n");
     } else {
-      printf("[conn][%p] Shut down by transport, 0x%x\n", Connection,
+      printf("[conn] Shut down by transport, 0x%x\n",
              Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
     }
     break;
@@ -298,7 +298,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     // The connection was explicitly shut down by the peer.
     //
-    printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection,
+    printf("[conn] Shut down by peer, 0x%llu\n",
            (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
@@ -306,7 +306,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The connection has completed the shutdown process and is ready to be
     // safely cleaned up.
     //
-    printf("[conn][%p] All done\n", Connection);
+    printf("[conn] All done\n");
     MsQuic->ConnectionClose(Connection);
     break;
   case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
@@ -314,7 +314,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The peer has started/created a new stream. The app MUST set the
     // callback handler before returning.
     //
-    printf("[strm][%p] Peer started\n", Event->PEER_STREAM_STARTED.Stream);
+    printf("[strm] Peer started\n");
     MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
                                (void *)ServerStreamCallback, NULL);
     break;
@@ -323,7 +323,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The connection succeeded in doing a TLS resumption of a previous
     // connection's session.
     //
-    printf("[conn][%p] Connection resumed!\n", Connection);
+    printf("[conn] Connection resumed!\n");
     break;
   default:
     break;
@@ -532,32 +532,32 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // returned back to the app.
     //
     free(Event->SEND_COMPLETE.ClientContext);
-    printf("[strm][%p] Data sent\n", Stream);
+    printf("[strm] Data sent\n");
     break;
   case QUIC_STREAM_EVENT_RECEIVE:
     //
     // Data was received from the peer on the stream.
     //
-    printf("[strm][%p] Data received\n", Stream);
+    printf("[strm] Data received\n");
     break;
   case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
     //
     // The peer gracefully shut down its send direction of the stream.
     //
-    printf("[strm][%p] Peer aborted\n", Stream);
+    printf("[strm] Peer aborted\n");
     break;
   case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
     //
     // The peer aborted its send direction of the stream.
     //
-    printf("[strm][%p] Peer shut down\n", Stream);
+    printf("[strm] Peer shut down\n");
     break;
   case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
     //
     // Both directions of the stream have been shut down and MsQuic is done
     // with the stream. It can now be safely cleaned up.
     //
-    printf("[strm][%p] All done\n", Stream);
+    printf("[strm] All done\n");
     if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
       MsQuic->StreamClose(Stream);
     }
@@ -585,7 +585,7 @@ void ClientSend(_In_ HQUIC Connection) {
     goto Error;
   }
 
-  printf("[strm][%p] Starting...\n", Stream);
+  printf("[strm] Starting...\n");
 
   //
   // Starts the bidirectional stream. By default, the peer is not notified of
@@ -611,7 +611,7 @@ void ClientSend(_In_ HQUIC Connection) {
   SendBuffer->Buffer = SendBufferRaw + sizeof(QUIC_BUFFER);
   SendBuffer->Length = SendBufferLength;
 
-  printf("[strm][%p] Sending data...\n", Stream);
+  printf("[strm] Sending data...\n");
 
   //
   // Sends the buffer over the stream. Note the FIN flag is passed along with
@@ -646,7 +646,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     // The handshake has completed for the connection.
     //
-    printf("[conn][%p] Connected\n", Connection);
+    printf("[conn] Connected\n");
     ClientSend(Connection);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
@@ -657,9 +657,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     if (Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status ==
         QUIC_STATUS_CONNECTION_IDLE) {
-      printf("[conn][%p] Successfully shut down on idle.\n", Connection);
+      printf("[conn] Successfully shut down on idle.\n");
     } else {
-      printf("[conn][%p] Shut down by transport, 0x%x\n", Connection,
+      printf("[conn] Shut down by transport, 0x%x\n",
              Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
     }
     break;
@@ -667,7 +667,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     // The connection was explicitly shut down by the peer.
     //
-    printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection,
+    printf("[conn] Shut down by peer, 0x%llu\n",
            (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
@@ -675,7 +675,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The connection has completed the shutdown process and is ready to be
     // safely cleaned up.
     //
-    printf("[conn][%p] All done\n", Connection);
+    printf("[conn] All done\n");
     if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
       MsQuic->ConnectionClose(Connection);
     }
@@ -685,7 +685,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // A resumption ticket (also called New Session Ticket or NST) was
     // received from the server.
     //
-    printf("[conn][%p] Resumption ticket received (%u bytes):\n", Connection,
+    printf("[conn] Resumption ticket received (%u bytes):\n",
            Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
     for (uint32_t i = 0;
          i < Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength; i++) {
@@ -801,7 +801,7 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
     goto Error;
   }
 
-  printf("[conn][%p] Connecting...\n", Connection);
+  printf("[conn] Connecting...\n");
 
   //
   // Start the connection to the server.

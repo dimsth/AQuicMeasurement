@@ -141,7 +141,7 @@ void ServerSend(_In_ HQUIC Connection) {
   SendBuffer->Buffer = (uint8_t *)SendBufferRaw + sizeof(QUIC_BUFFER);
   SendBuffer->Length = size_of_msgs;
 
-  printf("[strm][%p] Sending data...\n", Connection);
+  printf("[strm] Sending data...\n");
 
   //
   // Sends the buffer over the stream. Note the FIN flag is passed along with
@@ -222,7 +222,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     // The handshake has completed for the connection.
     //
-    printf("[conn][%p] Connected\n", Connection);
+    printf("[conn] Connected\n");
     QuicApi->ConnectionSendResumptionTicket(
         Connection, QUIC_SEND_RESUMPTION_FLAG_NONE, 0, NULL);
     break;
@@ -234,9 +234,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     if (Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status ==
         QUIC_STATUS_CONNECTION_IDLE) {
-      printf("[conn][%p] Successfully shut down on idle.\n", Connection);
+      printf("[conn] Successfully shut down on idle.\n");
     } else {
-      printf("[conn][%p] Shut down by transport, 0x%x\n", Connection,
+      printf("[conn] Shut down by transport, 0x%x\n",
              Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
     }
     break;
@@ -244,7 +244,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     // The connection was explicitly shut down by the peer.
     //
-    printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection,
+    printf("[conn] Shut down by peer, 0x%llu\n",
            (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
@@ -252,7 +252,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The connection has completed the shutdown process and is ready to be
     // safely cleaned up.
     //
-    printf("[conn][%p] All done\n", Connection);
+    printf("[conn] All done\n");
     QuicApi->ConnectionClose(Connection);
     break;
     /* case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
@@ -269,7 +269,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The connection succeeded in doing a TLS resumption of a previous
     // connection's session.
     //
-    printf("[conn][%p] Connection resumed!\n", Connection);
+    printf("[conn] Connection resumed!\n");
     break;
   case QUIC_CONNECTION_EVENT_DATAGRAM_RECEIVED:
     printf("Message received. Answering back.\n");
@@ -541,7 +541,7 @@ void ClientSend(_In_ HQUIC Connection, _In_ int msgs_num) {
   SendBuffer->Buffer = SendBufferRaw + sizeof(QUIC_BUFFER);
   SendBuffer->Length = size_of_msgs;
 
-  printf("[strm][%p] Sending data...\n", Connection);
+  printf("[strm] Sending data...\n");
 
   //
   // Sends the buffer over the stream. Note the FIN flag is passed along with
@@ -582,7 +582,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     // The handshake has completed for the connection.
     //
-    printf("[conn][%p] Connected\n", Connection);
+    printf("[conn] Connected\n");
     for (int i = 0; i < num_of_msgs; i++)
       ClientSend(Connection, i);
     break;
@@ -594,9 +594,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     if (Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status ==
         QUIC_STATUS_CONNECTION_IDLE) {
-      printf("[conn][%p] Successfully shut down on idle.\n", Connection);
+      printf("[conn] Successfully shut down on idle.\n");
     } else {
-      printf("[conn][%p] Shut down by transport, 0x%x\n", Connection,
+      printf("[conn] Shut down by transport, 0x%x\n",
              Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
     }
     break;
@@ -604,7 +604,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     // The connection was explicitly shut down by the peer.
     //
-    printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection,
+    printf("[conn] Shut down by peer, 0x%llu\n",
            (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
@@ -612,7 +612,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The connection has completed the shutdown process and is ready to be
     // safely cleaned up.
     //
-    printf("[conn][%p] All done\n", Connection);
+    printf("[conn] All done\n");
     if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
       QuicApi->ConnectionClose(Connection);
     }
@@ -622,7 +622,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // A resumption ticket (also called New Session Ticket or NST) was
     // received from the server.
     //
-    printf("[conn][%p] Resumption ticket received (%u bytes):\n", Connection,
+    printf("[conn] Resumption ticket received (%u bytes):\n",
            Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength);
     for (uint32_t i = 0;
          i < Event->RESUMPTION_TICKET_RECEIVED.ResumptionTicketLength; i++) {
@@ -739,7 +739,7 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
     Status = QUIC_STATUS_INVALID_PARAMETER;
     goto Error;
   }
-  printf("[conn][%p] Connecting...\n", Connection);
+  printf("[conn] Connecting...\n");
 
   //
   // Start the connection to the server.
