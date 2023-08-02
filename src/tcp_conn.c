@@ -119,8 +119,6 @@ void RunServer(int argc, char *argv[], int socket_desc) {
       num_of_msgs++;
       size_of_msgs += strlen(Buffer);
     }
-
-    sleep(1);
   }
 
   sprintf(message,
@@ -217,16 +215,19 @@ void RunClient(int argc, char *argv[], int hSocket) {
   }
   printf("Sucessfully conected with server\n");
 
+  printf("Start sending messages!\n");
   for (int i = 0; i < num_of_msgs; i++) {
     // Send data to the server
+    printf("[%d] Sending data...\n", i);
     if (SocketSend(hSocket, Buffer, strlen(Buffer)) < 0) {
       printf("Send failed\n");
       goto Error;
     }
 
-    sleep(1);
+    usleep(10000);
   }
 
+  printf("Sending final message!\n");
   if (SocketSend(hSocket, final_msg, strlen(final_msg)) < 0) {
     printf("Send final message failed\n");
     goto Error;
