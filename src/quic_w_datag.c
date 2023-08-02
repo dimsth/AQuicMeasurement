@@ -701,7 +701,6 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   }
 
   QUIC_STATUS Status;
-  const char *ResumptionTicketString = NULL;
   HQUIC Connection = NULL;
 
   const char *nom;

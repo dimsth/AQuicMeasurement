@@ -73,9 +73,8 @@ int BindCreatedSocket(int hSocket) {
   return iRetval;
 }
 
-void RunServer(int argc, char *argv[], int socket_desc) {
+void RunServer(int socket_desc) {
   int sock;
-  int conn_count = 0;
   struct sockaddr_in client;
   char Buffer[MAX_BUFFER_SIZE];
   char message[100];
@@ -196,8 +195,6 @@ void RunClient(int argc, char *argv[], int hSocket) {
   }
   size_of_msgs = atoi(som);
 
-  int read_size;
-  struct sockaddr_in server;
   char *Buffer = calloc(size_of_msgs, sizeof(char));
   for (int i = 0; i < size_of_msgs; i++)
     Buffer[i] = 90;
@@ -258,7 +255,7 @@ int main(int argc, char *argv[]) {
   } else if (GetFlag(argc, argv, "client")) {
     RunClient(argc, argv, hSocket);
   } else if (GetFlag(argc, argv, "server")) {
-    RunServer(argc, argv, hSocket);
+    RunServer(hSocket);
   } else {
     PrintUsage();
   }

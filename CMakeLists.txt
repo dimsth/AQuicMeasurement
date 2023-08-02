@@ -40,7 +40,7 @@ set(SOURCES2
 )
 
 # Sources for TCP/IP
-set(SOURCES2
+set(SOURCES3
     src/tcp_conn.c
 )
 
@@ -68,7 +68,7 @@ set_target_properties(ms_sample PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SAMPLE_OUT
 target_include_directories(ms_sample PRIVATE ${CMAKE_SOURCE_DIR}/../msquic/src/inc)
 
 #==========TCP/IP===========
-add_executable(tcp_conn ${SOURCES2})
+add_executable(tcp_conn ${SOURCES3})
 
 set_target_properties(tcp_conn PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SRC_OUTPUT_DIRECTORY})
 
