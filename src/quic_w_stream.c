@@ -54,6 +54,8 @@ unsigned int num_of_msgs = 0;
 
 long long int size_of_msgs = 0;
 
+float percent;
+
 char *final_msg = "Closing Socket!";
 
 void PrintUsage() {
@@ -522,7 +524,11 @@ int ClientSend(_In_ HQUIC Stream, _In_ int msgs_num) {
     SendBuffer->Buffer = malloc(SendBuffer->Length);
     memset(SendBuffer->Buffer, 90, SendBuffer->Length);
 
-    printf("[%d] Sending data...\n", msgs_num);
+    if ((int)percent == msgs_num) {
+      printf("[%d done] Sending data %d...\n",
+             (int)((percent * 100) / num_of_msgs), msgs_num);
+      percent += (float)num_of_msgs / 20;
+    }
   } else {
     SendBufferRaw = (uint8_t *)malloc(sizeof(QUIC_BUFFER) + size_of_msgs);
     if (SendBufferRaw == NULL) {
@@ -603,7 +609,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
       usleep(10000);
     }
 
-    printf("Sending final message!\n");
+    printf("[100 done] Sending final message!\n");
     ClientSend(Stream, -5);
   Error:
 
@@ -719,6 +725,7 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
     goto Error;
   }
   num_of_msgs = atoi(nom);
+  percent = (float)num_of_msgs / 20;
 
   const char *som;
   if ((som = GetValue(argc, argv, "size_of_msgs")) == NULL) {
