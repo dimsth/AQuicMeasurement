@@ -199,8 +199,9 @@ void RunClient(int argc, char *argv[], int hSocket) {
   size_of_msgs = atoi(som);
 
   char *Buffer = calloc(size_of_msgs, sizeof(char));
-  for (int i = 0; i < size_of_msgs; i++)
+  for (int i = 0; i < size_of_msgs - 1; i++)
     Buffer[i] = 90;
+  Buffer[size_of_msgs - 1] = '\0';
 
   const char *Target;
   if ((Target = GetValue(argc, argv, "target")) == NULL) {

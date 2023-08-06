@@ -509,20 +509,21 @@ int ClientSend(_In_ HQUIC Stream, _In_ int msgs_num) {
   uint8_t *SendBufferRaw;
   QUIC_BUFFER *SendBuffer;
 
+  SendBufferRaw = (uint8_t *)malloc(sizeof(QUIC_BUFFER) + size_of_msgs);
+  if (SendBufferRaw == NULL) {
+    printf("SendBuffer allocation failed!\n");
+    Status = QUIC_STATUS_OUT_OF_MEMORY;
+    return FALSE;
+  }
+  SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
   //
   // Allocates and builds the buffer to send over the stream.
   //
   if (msgs_num != -5) {
-    SendBufferRaw = (uint8_t *)malloc(sizeof(QUIC_BUFFER) + size_of_msgs);
-    if (SendBufferRaw == NULL) {
-      printf("SendBuffer allocation failed!\n");
-      Status = QUIC_STATUS_OUT_OF_MEMORY;
-      return FALSE;
-    }
-    SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
     SendBuffer->Length = size_of_msgs;
     SendBuffer->Buffer = malloc(SendBuffer->Length);
-    memset(SendBuffer->Buffer, 90, SendBuffer->Length);
+    memset(SendBuffer->Buffer, 90, SendBuffer->Length - 1);
+    SendBuffer->Buffer[SendBuffer->Length - 1] = '\0';
 
     if ((int)percent == msgs_num) {
       printf("[%d done] Sending data %d...\n",
@@ -530,14 +531,6 @@ int ClientSend(_In_ HQUIC Stream, _In_ int msgs_num) {
       percent += (float)num_of_msgs / 20;
     }
   } else {
-    SendBufferRaw = (uint8_t *)malloc(sizeof(QUIC_BUFFER) + size_of_msgs);
-    if (SendBufferRaw == NULL) {
-      printf("SendBuffer allocation failed!\n");
-      Status = QUIC_STATUS_OUT_OF_MEMORY;
-      return FALSE;
-    }
-
-    SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
     SendBuffer->Length = strlen(final_msg) + 1;
     SendBuffer->Buffer = malloc(SendBuffer->Length);
     memcpy(SendBuffer->Buffer, final_msg, SendBuffer->Length);
