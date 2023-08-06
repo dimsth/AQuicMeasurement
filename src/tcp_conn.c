@@ -18,6 +18,8 @@ unsigned int num_of_msgs = 0;
 
 long long int size_of_msgs = 0;
 
+float percent;
+
 void PrintUsage() {
   printf("\n"
          "TCP/IP connection runs client or server.\n"
@@ -187,6 +189,7 @@ void RunClient(int argc, char *argv[], int hSocket) {
     goto Error;
   }
   num_of_msgs = atoi(nom);
+  percent = (float)num_of_msgs / 20;
 
   const char *som;
   if ((som = GetValue(argc, argv, "size_of_msgs")) == NULL) {
@@ -215,7 +218,11 @@ void RunClient(int argc, char *argv[], int hSocket) {
   printf("Start sending messages!\n");
   for (int i = 0; i < num_of_msgs; i++) {
     // Send data to the server
-    printf("[%d] Sending data...\n", i);
+    if ((int)percent == i) {
+      printf("[%d done] Sending data %d...\n",
+             (int)((percent * 100) / num_of_msgs), i);
+      percent += (float)num_of_msgs / 20;
+    }
     if (SocketSend(hSocket, Buffer, strlen(Buffer)) < 0) {
       printf("Send failed\n");
       goto Error;
@@ -224,7 +231,7 @@ void RunClient(int argc, char *argv[], int hSocket) {
     usleep(10000);
   }
 
-  printf("Sending final message!\n");
+  printf("[100 done] Sending final message!\n");
   if (SocketSend(hSocket, final_msg, strlen(final_msg)) < 0) {
     printf("Send final message failed\n");
     goto Error;
