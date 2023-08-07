@@ -27,10 +27,6 @@ const QUIC_REGISTRATION_CONFIG RegConfig = {"quic_stream",
 const QUIC_BUFFER Alpn = {sizeof("sample") - 1, (uint8_t *)"sample"};
 
 //
-// The length of buffer sent over the streams in the protocol.
-//
-
-//
 // The QUIC API/function table returned from MsQuicOpen2. It contains all the
 // functions called by the app to interact with MsQuic.
 //
@@ -340,12 +336,14 @@ ServerLoadConfiguration(_In_ int argc,
   //
   Settings.IdleTimeoutMs = IDLE_TIMEOUT;
   Settings.IsSet.IdleTimeoutMs = TRUE;
+
   //
   // Configures the server's resumption level to allow for resumption and
   // 0-RTT.
   //
   Settings.ServerResumptionLevel = QUIC_SERVER_RESUME_AND_ZERORTT;
   Settings.IsSet.ServerResumptionLevel = TRUE;
+
   //
   // Configures the server's settings to allow for the peer to open a single
   // bidirectional stream. By default connections are not configured to allow
@@ -563,53 +561,14 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     ClientConnectionCallback(_In_ HQUIC Connection, _In_opt_ void *Context,
                              _Inout_ QUIC_CONNECTION_EVENT *Event) {
   UNREFERENCED_PARAMETER(Context);
-  QUIC_STATUS Status;
-  HQUIC Stream = NULL;
   switch (Event->Type) {
   case QUIC_CONNECTION_EVENT_CONNECTED:
-
-    //
-    // Create/allocate a new bidirectional stream. The stream is just allocated
-    // and no QUIC stream identifier is assigned until it's started.
-    //
-    if (QUIC_FAILED(Status = QuicApi->StreamOpen(
-                        Connection, QUIC_STREAM_OPEN_FLAG_NONE,
-                        ClientStreamCallback, NULL, &Stream))) {
-      printf("StreamOpen failed, 0x%x!\n", Status);
-      goto Error;
-    }
-
-    //
-    // Starts the bidirectional stream. By default, the peer is not notified of
-    // the stream being started until data is sent on the stream.
-    //
-    if (QUIC_FAILED(Status = QuicApi->StreamStart(
-                        Stream, QUIC_STREAM_START_FLAG_NONE))) {
-      printf("StreamStart failed, 0x%x!\n", Status);
-      QuicApi->StreamClose(Stream);
-      goto Error;
-    }
 
     //
     // The handshake has completed for the connection.
     //
     printf("[conn] Connected\n");
 
-    printf("Start sending messages!\n");
-    for (int i = 0; i < num_of_msgs; i++) {
-      ClientSend(Stream, i);
-
-      usleep(10000);
-    }
-
-    printf("[100 done] Sending final message!\n");
-    ClientSend(Stream, -5);
-  Error:
-
-    if (QUIC_FAILED(Status)) {
-      QuicApi->ConnectionShutdown(Connection,
-                                  QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 0);
-    }
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
     //
@@ -709,6 +668,7 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   }
 
   QUIC_STATUS Status;
+  HQUIC Stream = NULL;
   HQUIC Connection = NULL;
 
   const char *nom;
@@ -758,6 +718,35 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
     printf("ConnectionStart failed, 0x%x!\n", Status);
     goto Error;
   }
+
+  //
+  // Create/allocate a new bidirectional stream. The stream is just allocated
+  // and no QUIC stream identifier is assigned until it's started.
+  //
+  if (QUIC_FAILED(
+          Status = QuicApi->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE,
+                                       ClientStreamCallback, NULL, &Stream))) {
+    printf("StreamOpen failed, 0x%x!\n", Status);
+    goto Error;
+  }
+
+  //
+  // Starts the bidirectional stream. By default, the peer is not notified of
+  // the stream being started until data is sent on the stream.
+  //
+  if (QUIC_FAILED(
+          Status = QuicApi->StreamStart(Stream, QUIC_STREAM_START_FLAG_NONE))) {
+    printf("StreamStart failed, 0x%x!\n", Status);
+    QuicApi->StreamClose(Stream);
+    goto Error;
+  }
+
+  printf("Start sending messages!\n");
+  for (int i = 0; i < num_of_msgs; i++)
+    ClientSend(Stream, i);
+
+  printf("[100 done] Sending final message!\n");
+  ClientSend(Stream, -5);
 
 Error:
 
