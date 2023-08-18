@@ -1,5 +1,4 @@
 #include <arpa/inet.h>
-#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -158,21 +157,6 @@ int SocketConnect(int hSocket, const char *IP_address) {
   return iRetval;
 }
 
-// Send the data to the server and set the timeout of 20 seconds
-int SocketSend(int hSocket, char *Rqst, short lenRqst) {
-  int shortRetval = -1;
-  struct timeval tv;
-  tv.tv_sec = 20; /* 20 Secs Timeout */
-  tv.tv_usec = 0;
-  if (setsockopt(hSocket, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv, sizeof(tv)) <
-      0) {
-    printf("Time Out\n");
-    return -1;
-  }
-  shortRetval = send(hSocket, Rqst, lenRqst, 0);
-  return shortRetval;
-}
-
 // receive the data from the server
 int SocketReceive(int hSocket, char *Rsp, short RvcSize) {
   int shortRetval = -1;
@@ -222,14 +206,14 @@ void RunClient(int argc, char *argv[], int hSocket) {
              (int)((percent * 100) / num_of_msgs), i);
       percent += (float)num_of_msgs / 20;
     }
-    if (send(hSocket, Buffer, strlen(Buffer), NULL) < 0) {
+    if (send(hSocket, Buffer, size_of_msgs, 0) < 0) {
       printf("Send failed\n");
       goto Error;
     }
   }
 
   printf("[100 done] Sending final message!\n");
-  if (SocketSend(hSocket, final_msg, strlen(final_msg)) < 0) {
+  if (send(hSocket, final_msg, strlen(final_msg) + 1, 0) < 0) {
     printf("Send final message failed\n");
     goto Error;
   }
