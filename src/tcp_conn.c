@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -101,24 +102,29 @@ void RunServer(int socket_desc) {
     goto Error;
   }
   printf("Connection accepted\n");
+
+  int fm_size = strlen(final_msg);
+  int ret;
   // Accept and incoming connection
   while (1) {
-    memset(Buffer, '\0', MAX_BUFFER_SIZE);
+    memset(Buffer, 0, MAX_BUFFER_SIZE);
 
     //  Receive a reply from the client
-    int ret = recv(sock, Buffer, MAX_BUFFER_SIZE, 0);
+    ret = recv(sock, Buffer, MAX_BUFFER_SIZE, 0);
     if (ret < 0) {
       printf("Recv failed! \n");
       goto Error;
     } else if (ret == 0) {
       printf("Client closed connection! \n");
       goto Close_Sock;
-    } else if (strncmp(Buffer, final_msg, 15) == 0) {
-      printf("Final message came!\n");
-      break;
     } else {
       num_of_msgs++;
-      size_of_msgs += strlen(Buffer);
+      size_of_msgs += ret;
+    }
+
+    if (memcmp(Buffer + ret - fm_size, final_msg, fm_size) == 0) {
+      printf("Final message came!\n");
+      break;
     }
   }
 
@@ -134,7 +140,8 @@ void RunServer(int socket_desc) {
   }
 
 Error:
-  printf("Error occured!");
+  if (ret < 0)
+    printf("Error occured!");
 Close_Sock:
   close(sock);
 }
@@ -169,14 +176,6 @@ int SocketSend(int hSocket, char *Rqst, short lenRqst) {
 // receive the data from the server
 int SocketReceive(int hSocket, char *Rsp, short RvcSize) {
   int shortRetval = -1;
-  struct timeval tv;
-  tv.tv_sec = 20; /* 20 Secs Timeout */
-  tv.tv_usec = 0;
-  if (setsockopt(hSocket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(tv)) <
-      0) {
-    printf("Time Out\n");
-    return -1;
-  }
   shortRetval = recv(hSocket, Rsp, RvcSize, 0);
   printf("Server Response: %s\n", Rsp);
   return shortRetval;
@@ -199,8 +198,7 @@ void RunClient(int argc, char *argv[], int hSocket) {
   size_of_msgs = atoi(som);
 
   char *Buffer = calloc(size_of_msgs, sizeof(char));
-  for (int i = 0; i < size_of_msgs - 1; i++)
-    Buffer[i] = 90;
+  memset(Buffer, 90, size_of_msgs - 1);
   Buffer[size_of_msgs - 1] = '\0';
 
   const char *Target;
@@ -217,19 +215,17 @@ void RunClient(int argc, char *argv[], int hSocket) {
   printf("Sucessfully conected with server\n");
 
   printf("Start sending messages!\n");
-  for (int i = 0; i < num_of_msgs; i++) {
+  for (unsigned int i = 0; i < num_of_msgs; i++) {
     // Send data to the server
-    if ((int)percent == i) {
+    if ((unsigned int)percent == i) {
       printf("[%d done] Sending data %d...\n",
              (int)((percent * 100) / num_of_msgs), i);
       percent += (float)num_of_msgs / 20;
     }
-    if (SocketSend(hSocket, Buffer, strlen(Buffer)) < 0) {
+    if (send(hSocket, Buffer, strlen(Buffer), NULL) < 0) {
       printf("Send failed\n");
       goto Error;
     }
-
-    usleep(10000);
   }
 
   printf("[100 done] Sending final message!\n");
