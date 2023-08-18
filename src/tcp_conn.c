@@ -5,12 +5,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define PORT 5678
 #define KILO_NUM 1024
 #define MEGA_NUM (KILO_NUM * KILO_NUM)
 #define MAX_BUFFER_SIZE (5 * MEGA_NUM)
 
 typedef enum { FALSE = 0, TRUE = 1 } BOOLEAN;
+
+int Port = 0;
 
 char *final_msg = "Closing Socket!";
 
@@ -26,9 +27,9 @@ void PrintUsage() {
          "\n"
          "Usage:\n"
          "\n"
-         "  ./tcp_conn -client -target:{IPAddress} -num_of_msgs:{Number} "
-         "-size_of_msgs:{Number}\n"
-         "  ./tcp_conn -server \n");
+         "  ./tcp_conn -client -target:{IPAddress} -port:{Port Number} "
+         "-num_of_msgs:{Number} -size_of_msgs:{Number}\n"
+         "  ./tcp_conn -server -port:{Port Number} \n");
 }
 
 //
@@ -70,16 +71,24 @@ int BindCreatedSocket(int hSocket) {
   struct sockaddr_in remote = {0};
   remote.sin_family = AF_INET;
   remote.sin_addr.s_addr = htonl(INADDR_ANY);
-  remote.sin_port = htons(PORT);
+  remote.sin_port = htons(Port);
   iRetval = bind(hSocket, (struct sockaddr *)&remote, sizeof(remote));
   return iRetval;
 }
 
-void RunServer(int socket_desc) {
+void RunServer(int argc, char *argv[], int socket_desc) {
   int sock;
   struct sockaddr_in client;
   char Buffer[MAX_BUFFER_SIZE];
   char message[100];
+
+  // Get Port num from the argv
+  const char *s_port;
+  if ((s_port = GetValue(argc, argv, "port")) == NULL) {
+    printf("Must specify '-port' argument!\n");
+    goto Error;
+  }
+  Port = atoi(s_port);
 
   // Bind
   if (BindCreatedSocket(socket_desc) < 0) {
@@ -102,7 +111,7 @@ void RunServer(int socket_desc) {
   }
   printf("Connection accepted\n");
 
-  int fm_size = strlen(final_msg);
+  int fm_size = strlen(final_msg) + 1;
   int ret;
   // Accept and incoming connection
   while (1) {
@@ -151,7 +160,7 @@ int SocketConnect(int hSocket, const char *IP_address) {
   struct sockaddr_in remote = {0};
   remote.sin_addr.s_addr = inet_addr(IP_address); // Local Host
   remote.sin_family = AF_INET;
-  remote.sin_port = htons(PORT);
+  remote.sin_port = htons(Port);
   iRetval =
       connect(hSocket, (struct sockaddr *)&remote, sizeof(struct sockaddr_in));
   return iRetval;
@@ -166,6 +175,8 @@ int SocketReceive(int hSocket, char *Rsp, short RvcSize) {
 }
 
 void RunClient(int argc, char *argv[], int hSocket) {
+
+  // Get number of msgs to send from argv
   const char *nom;
   if ((nom = GetValue(argc, argv, "num_of_msgs")) == NULL) {
     printf("Must specify '-num_of_msgs' argument!\n");
@@ -174,6 +185,7 @@ void RunClient(int argc, char *argv[], int hSocket) {
   num_of_msgs = atoi(nom);
   percent = (float)num_of_msgs / 20;
 
+  // Get size of msgs to send from argv
   const char *som;
   if ((som = GetValue(argc, argv, "size_of_msgs")) == NULL) {
     printf("Must specify '-size_of_msgs' argument!\n");
@@ -181,15 +193,25 @@ void RunClient(int argc, char *argv[], int hSocket) {
   }
   size_of_msgs = atoi(som);
 
+  // Allocate the msgs that in the correct size
   char *Buffer = calloc(size_of_msgs, sizeof(char));
   memset(Buffer, 90, size_of_msgs - 1);
   Buffer[size_of_msgs - 1] = '\0';
 
+  // Get IP from argv
   const char *Target;
   if ((Target = GetValue(argc, argv, "target")) == NULL) {
     printf("Must specify '-target' argument!\n");
     goto Error;
   }
+
+  // Get Port num from the argv
+  const char *s_port;
+  if ((s_port = GetValue(argc, argv, "port")) == NULL) {
+    printf("Must specify '-port' argument!\n");
+    goto Error;
+  }
+  Port = atoi(s_port);
 
   // Connect to remote server
   if (SocketConnect(hSocket, Target) < 0) {
@@ -243,7 +265,7 @@ int main(int argc, char *argv[]) {
   } else if (GetFlag(argc, argv, "client")) {
     RunClient(argc, argv, hSocket);
   } else if (GetFlag(argc, argv, "server")) {
-    RunServer(hSocket);
+    RunServer(argc, argv, hSocket);
   } else {
     PrintUsage();
   }
