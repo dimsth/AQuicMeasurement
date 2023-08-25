@@ -54,6 +54,10 @@ float percent;
 
 char *final_msg = "Closing Socket!";
 
+BOOLEAN ConnectedConnection = FALSE;
+
+BOOLEAN SendComplete = FALSE;
+
 void PrintUsage() {
   printf("\n"
          "quic connection using streams runs client or server.\n"
@@ -140,16 +144,17 @@ void ServerSend(_In_ HQUIC Stream) {
   //
   // Allocates and builds the buffer to send over the stream.
   //
-  void *SendBufferRaw = malloc(sizeof(QUIC_BUFFER) + size_of_msgs);
-  if (SendBufferRaw == NULL) {
+  QUIC_BUFFER *SendBuffer = malloc(sizeof(QUIC_BUFFER));
+  QUIC_BUFFER Buffer;
+  if (SendBuffer == NULL) {
     printf("SendBuffer allocation failed!\n");
     QuicApi->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
     return;
   }
-  QUIC_BUFFER *SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
-  SendBuffer->Length = 100;
-  SendBuffer->Buffer = malloc(100);
-  memcpy(SendBuffer->Buffer, message, strlen(message));
+  Buffer.Length = strlen(message) + 1;
+  Buffer.Buffer = calloc(1, Buffer.Length);
+  memcpy(Buffer.Buffer, message, Buffer.Length);
+  SendBuffer[0] = Buffer;
 
   printf("[strm] Sending data...\n");
 
@@ -162,7 +167,7 @@ void ServerSend(_In_ HQUIC Stream) {
   if (QUIC_FAILED(Status = QuicApi->StreamSend(
                       Stream, SendBuffer, 1, QUIC_SEND_FLAG_FIN, SendBuffer))) {
     printf("StreamSend failed, 0x%x!\n", Status);
-    free(SendBufferRaw);
+    free(SendBuffer);
     QuicApi->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
   }
 }
@@ -190,13 +195,20 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     num_of_msgs++;
     size_of_msgs += Event->RECEIVE.Buffers->Length;
+
+    if (memcmp(Event->RECEIVE.Buffers->Buffer + Event->RECEIVE.Buffers->Length -
+                   16,
+               final_msg, 16) == 0) {
+      printf("Final message came!\n");
+      ServerSend(Stream);
+      break;
+    }
     break;
   case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
     //
     // The peer gracefully shut down its send direction of the stream.
     //
     printf("[strm] Peer shut down\n");
-    ServerSend(Stream);
     break;
   case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
     //
@@ -336,6 +348,8 @@ ServerLoadConfiguration(_In_ int argc,
   //
   Settings.IdleTimeoutMs = IDLE_TIMEOUT;
   Settings.IsSet.IdleTimeoutMs = TRUE;
+  Settings.StreamRecvBufferDefault = 5 * 1024 * 1024;
+  Settings.StreamRecvWindowDefault = 5 * 1024 * 1024;
 
   //
   // Configures the server's resumption level to allow for resumption and
@@ -466,6 +480,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // returned back to the app.
     //
     free(Event->SEND_COMPLETE.ClientContext);
+    SendComplete = TRUE;
     break;
   case QUIC_STREAM_EVENT_RECEIVE:
     //
@@ -504,52 +519,58 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 
 int ClientSend(_In_ HQUIC Stream, _In_ int msgs_num) {
   QUIC_STATUS Status;
-  uint8_t *SendBufferRaw;
-  QUIC_BUFFER *SendBuffer;
+  QUIC_BUFFER Buffer;
+  QUIC_SEND_FLAGS send_flags;
 
-  SendBufferRaw = (uint8_t *)malloc(sizeof(QUIC_BUFFER) + size_of_msgs);
-  if (SendBufferRaw == NULL) {
+  QUIC_BUFFER *SendBuffer = calloc(1, sizeof(QUIC_BUFFER) + size_of_msgs);
+  if (SendBuffer == NULL) {
     printf("SendBuffer allocation failed!\n");
     Status = QUIC_STATUS_OUT_OF_MEMORY;
     return FALSE;
   }
-  SendBuffer = (QUIC_BUFFER *)SendBufferRaw;
   //
   // Allocates and builds the buffer to send over the stream.
   //
   if (msgs_num != -5) {
-    SendBuffer->Length = size_of_msgs;
-    SendBuffer->Buffer = malloc(SendBuffer->Length);
-    memset(SendBuffer->Buffer, 90, SendBuffer->Length - 1);
-    SendBuffer->Buffer[SendBuffer->Length - 1] = '\0';
+    Buffer.Length = size_of_msgs;
+    Buffer.Buffer = calloc(1, Buffer.Length + 1);
+    memset(Buffer.Buffer, 90, Buffer.Length - 1);
+    Buffer.Buffer[Buffer.Length - 1] = '\0';
 
+    SendBuffer[0] = Buffer;
     if ((int)percent == msgs_num) {
       printf("[%d done] Sending data %d...\n",
              (int)((percent * 100) / num_of_msgs), msgs_num);
       percent += (float)num_of_msgs / 20;
     }
+
+    send_flags = QUIC_SEND_FLAG_NONE;
   } else {
-    SendBuffer->Length = strlen(final_msg) + 1;
-    SendBuffer->Buffer = malloc(SendBuffer->Length);
-    memcpy(SendBuffer->Buffer, final_msg, SendBuffer->Length);
+    Buffer.Length = strlen(final_msg) + 1;
+    Buffer.Buffer = calloc(1, Buffer.Length);
+    memcpy(Buffer.Buffer, final_msg, Buffer.Length);
+    SendBuffer[0] = Buffer;
+
+    send_flags = QUIC_SEND_FLAG_NONE;
+    // send_flags = QUIC_SEND_FLAG_FIN;
   }
   //
   // Sends the buffer over the stream. Note the FIN flag is passed along with
   // the buffer. This indicates this is the last buffer on the stream and the
   // the stream is shut down (in the send direction) immediately after.
   //
-  QUIC_SEND_FLAGS send_flags;
-  if (msgs_num == -5)
-    send_flags = QUIC_SEND_FLAG_FIN;
-  else
-    send_flags = QUIC_SEND_FLAG_NONE;
 
   if (QUIC_FAILED(Status = QuicApi->StreamSend(Stream, SendBuffer, 1,
                                                send_flags, SendBuffer))) {
     printf("StreamSend failed, 0x%x!\n", Status);
-    free(SendBufferRaw);
+    free(SendBuffer);
     return FALSE;
   }
+
+  while (SendComplete == FALSE)
+    ;
+  free(Buffer.Buffer);
+  SendComplete = FALSE;
   return TRUE;
 }
 
@@ -568,6 +589,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The handshake has completed for the connection.
     //
     printf("[conn] Connected\n");
+    ConnectedConnection = TRUE;
 
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
@@ -741,9 +763,12 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
     goto Error;
   }
 
+  while (ConnectedConnection == FALSE)
+    ;
+
   printf("Start sending messages!\n");
-  for (int i = 0; i < num_of_msgs; i++)
-    ClientSend(Stream, i);
+  for (unsigned int i = 0; i < num_of_msgs; i++)
+    ClientSend(Stream, (int)i);
 
   printf("[100 done] Sending final message!\n");
   ClientSend(Stream, -5);
