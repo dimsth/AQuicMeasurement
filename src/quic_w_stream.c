@@ -56,7 +56,7 @@ char *final_msg = "Closing Socket!";
 
 BOOLEAN ConnectedConnection = FALSE;
 
-BOOLEAN SendComplete = FALSE;
+BOOLEAN ServerFinished = FALSE;
 
 QUIC_BUFFER Buffer;
 
@@ -278,7 +278,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     printf("[conn] All done\n");
     QuicApi->ConnectionClose(Connection);
     free(Buffer.Buffer);
-    exit(0);
+    ServerFinished = TRUE;
+    break;
   case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
     //
     // The peer has started/created a new stream. The app MUST set the
@@ -459,8 +460,9 @@ void RunServer(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   //
   // Continue listening for connections until the Enter key is pressed.
   //
-  printf("Press Enter to exit.\n\n");
-  getchar();
+  printf("Waiting for connection.\n\n");
+  while (ServerFinished == FALSE)
+    ;
 
 Error:
 
@@ -484,7 +486,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // returned back to the app.
     //
     free(Event->SEND_COMPLETE.ClientContext);
-    SendComplete = TRUE;
     break;
   case QUIC_STREAM_EVENT_RECEIVE:
     //
