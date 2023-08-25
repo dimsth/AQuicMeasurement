@@ -13,11 +13,11 @@ typedef enum { FALSE = 0, TRUE = 1 } BOOLEAN;
 
 int Port = 0;
 
-char *final_msg = "Closing Socket!";
+char *final_block = "Closing Socket!";
 
-unsigned int num_of_msgs = 0;
+unsigned int num_of_blocks = 0;
 
-long long int size_of_msgs = 0;
+long long int size_of_blocks = 0;
 
 float percent;
 
@@ -28,7 +28,7 @@ void PrintUsage() {
          "Usage:\n"
          "\n"
          "  ./tcp_conn -client -target:{IPAddress} -port:{Port Number} "
-         "-num_of_msgs:{Number} -size_of_msgs:{Number}\n"
+         "-num_of_blocks:{Number} -size_of_blocks:{Number}\n"
          "  ./tcp_conn -server -port:{Port Number} \n");
 }
 
@@ -111,7 +111,7 @@ void RunServer(int argc, char *argv[], int socket_desc) {
   }
   printf("Connection accepted\n");
 
-  int fm_size = strlen(final_msg) + 1;
+  int fm_size = strlen(final_block) + 1;
   int ret;
   // Accept and incoming connection
   while (1) {
@@ -126,20 +126,21 @@ void RunServer(int argc, char *argv[], int socket_desc) {
       printf("Client closed connection! \n");
       goto Close_Sock;
     } else {
-      num_of_msgs++;
-      size_of_msgs += ret;
+      num_of_blocks++;
+      size_of_blocks += ret;
     }
 
-    if (memcmp(Buffer + ret - fm_size, final_msg, fm_size) == 0) {
+    if (memcmp(Buffer + ret - fm_size, final_block, fm_size) == 0) {
       printf("Final message came!\n");
       break;
     }
   }
 
-  sprintf(message,
-          "Received total number of msgs: %d \n Received total size of msgs: "
-          "%lld \n",
-          num_of_msgs, size_of_msgs);
+  sprintf(
+      message,
+      "Received total number of blocks: %d \n Received total size of blocks: "
+      "%lld \n",
+      num_of_blocks, size_of_blocks);
   printf("%s", message);
   // Send some data
   if (send(sock, message, strlen(message), 0) < 0) {
@@ -176,27 +177,27 @@ int SocketReceive(int hSocket, char *Rsp, short RvcSize) {
 
 void RunClient(int argc, char *argv[], int hSocket) {
 
-  // Get number of msgs to send from argv
+  // Get number of blocks to send from argv
   const char *nom;
-  if ((nom = GetValue(argc, argv, "num_of_msgs")) == NULL) {
-    printf("Must specify '-num_of_msgs' argument!\n");
+  if ((nom = GetValue(argc, argv, "num_of_blocks")) == NULL) {
+    printf("Must specify '-num_of_blocks' argument!\n");
     goto Error;
   }
-  num_of_msgs = atoi(nom);
-  percent = (float)num_of_msgs / 20;
+  num_of_blocks = atoi(nom);
+  percent = (float)num_of_blocks / 20;
 
-  // Get size of msgs to send from argv
+  // Get size of blocks to send from argv
   const char *som;
-  if ((som = GetValue(argc, argv, "size_of_msgs")) == NULL) {
-    printf("Must specify '-size_of_msgs' argument!\n");
+  if ((som = GetValue(argc, argv, "size_of_blocks")) == NULL) {
+    printf("Must specify '-size_of_blocks' argument!\n");
     goto Error;
   }
-  size_of_msgs = atoi(som);
+  size_of_blocks = atoi(som);
 
-  // Allocate the msgs that in the correct size
-  char *Buffer = calloc(size_of_msgs, sizeof(char));
-  memset(Buffer, 90, size_of_msgs - 1);
-  Buffer[size_of_msgs - 1] = '\0';
+  // Allocate the blocks that in the correct size
+  char *Buffer = calloc(size_of_blocks, sizeof(char));
+  memset(Buffer, 90, size_of_blocks - 1);
+  Buffer[size_of_blocks - 1] = '\0';
 
   // Get IP from argv
   const char *Target;
@@ -221,21 +222,21 @@ void RunClient(int argc, char *argv[], int hSocket) {
   printf("Sucessfully conected with server\n");
 
   printf("Start sending messages!\n");
-  for (unsigned int i = 0; i < num_of_msgs; i++) {
+  for (unsigned int i = 0; i < num_of_blocks; i++) {
     // Send data to the server
     if ((unsigned int)percent == i) {
       printf("[%d done] Sending data %d...\n",
-             (int)((percent * 100) / num_of_msgs), i);
-      percent += (float)num_of_msgs / 20;
+             (int)((percent * 100) / num_of_blocks), i);
+      percent += (float)num_of_blocks / 20;
     }
-    if (send(hSocket, Buffer, size_of_msgs, 0) < 0) {
+    if (send(hSocket, Buffer, size_of_blocks, 0) < 0) {
       printf("Send failed\n");
       goto Error;
     }
   }
 
   printf("[100 done] Sending final message!\n");
-  if (send(hSocket, final_msg, strlen(final_msg) + 1, 0) < 0) {
+  if (send(hSocket, final_block, strlen(final_block) + 1, 0) < 0) {
     printf("Send final message failed\n");
     goto Error;
   }
@@ -249,6 +250,7 @@ void RunClient(int argc, char *argv[], int hSocket) {
   }
 
 Error:
+  free(Buffer);
   close(hSocket);
 }
 

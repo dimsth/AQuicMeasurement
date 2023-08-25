@@ -46,13 +46,13 @@ HQUIC Registration;
 //
 HQUIC Configuration;
 
-unsigned int num_of_msgs = 0;
+unsigned int num_of_blocks = 0;
 
-long long int size_of_msgs = 0;
+long long int size_of_blocks = 0;
 
 float percent;
 
-char *final_msg = "Closing Socket!";
+char *final_block = "Closing Socket!";
 
 BOOLEAN ConnectedConnection = FALSE;
 
@@ -69,7 +69,7 @@ void PrintUsage() {
          "Usage:\n"
          "\n"
          "  ./q_stream -client -unsecure -target:{IPAddress} "
-         "-num_of_msgs:{Number} -size_of_msgs:{Number}\n"
+         "-num_of_blocks:{Number} -size_of_blocks:{Number}\n"
          "  ./q_stream -server -cert_file:<...> -key_file:<...> \n");
 }
 
@@ -140,10 +140,11 @@ uint32_t DecodeHexBuffer(_In_z_ const char *HexBuffer,
 //
 void ServerSend(_In_ HQUIC Stream) {
   char message[100];
-  sprintf(message,
-          "Received total number of msgs: %d \n Received total size of msgs: "
-          "%lld \n",
-          num_of_msgs, size_of_msgs - 16);
+  sprintf(
+      message,
+      "Received total number of blocks: %d \n Received total size of blocks: "
+      "%lld \n",
+      num_of_blocks, size_of_blocks - 16);
   printf("%s", message);
   //
   // Allocates and builds the buffer to send over the stream.
@@ -196,12 +197,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     // Data was received from the peer on the stream.
     //
-    num_of_msgs++;
-    size_of_msgs += Event->RECEIVE.Buffers->Length;
+    num_of_blocks++;
+    size_of_blocks += Event->RECEIVE.Buffers->Length;
 
     if (memcmp(Event->RECEIVE.Buffers->Buffer + Event->RECEIVE.Buffers->Length -
                    16,
-               final_msg, 16) == 0) {
+               final_block, 16) == 0) {
       printf("Final message came!\n");
       ServerSend(Stream);
       break;
@@ -530,7 +531,7 @@ int ClientSend(_In_ HQUIC Stream) {
   //
   // Allocates and builds the buffer to send over the stream.
   //
-  Buffer.Length = size_of_msgs;
+  Buffer.Length = size_of_blocks;
   Buffer.Buffer = calloc(1, Buffer.Length + 1);
   memset(Buffer.Buffer, 90, Buffer.Length - 1);
   Buffer.Buffer[Buffer.Length - 1] = '\0';
@@ -542,8 +543,8 @@ int ClientSend(_In_ HQUIC Stream) {
   // the stream is shut down (in the send direction) immediately after.
   //
 
-  for (unsigned int i = 0; i < num_of_msgs; i++) {
-    SendBuffer = calloc(1, sizeof(QUIC_BUFFER) + size_of_msgs);
+  for (unsigned int i = 0; i < num_of_blocks; i++) {
+    SendBuffer = calloc(1, sizeof(QUIC_BUFFER) + size_of_blocks);
     if (SendBuffer == NULL) {
       printf("SendBuffer allocation failed!\n");
       Status = QUIC_STATUS_OUT_OF_MEMORY;
@@ -559,16 +560,16 @@ int ClientSend(_In_ HQUIC Stream) {
     }
     if ((unsigned int)percent == i) {
       printf("[%d done] Sending data %d...\n",
-             (int)((percent * 100) / num_of_msgs), i);
-      percent += (float)num_of_msgs / 20;
+             (int)((percent * 100) / num_of_blocks), i);
+      percent += (float)num_of_blocks / 20;
     }
   }
 
   printf("[100 done] Sending final message!\n");
 
-  FinalBuffer.Length = strlen(final_msg) + 1;
+  FinalBuffer.Length = strlen(final_block) + 1;
   FinalBuffer.Buffer = calloc(1, FinalBuffer.Length);
-  memcpy(FinalBuffer.Buffer, final_msg, FinalBuffer.Length);
+  memcpy(FinalBuffer.Buffer, final_block, FinalBuffer.Length);
 
   SendBuffer = calloc(1, sizeof(QUIC_BUFFER) + 16);
   if (SendBuffer == NULL) {
@@ -580,7 +581,7 @@ int ClientSend(_In_ HQUIC Stream) {
 
   if (QUIC_FAILED(Status = QuicApi->StreamSend(Stream, SendBuffer, 1,
                                                send_flags, SendBuffer))) {
-    printf("StreamSend failed to send final msg, 0x%x!\n", Status);
+    printf("StreamSend failed to send final block, 0x%x!\n", Status);
     free(SendBuffer);
     return FALSE;
   }
@@ -711,21 +712,21 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   HQUIC Connection = NULL;
 
   const char *nom;
-  if ((nom = GetValue(argc, argv, "num_of_msgs")) == NULL) {
-    printf("Must specify '-num_of_msgs' argument!\n");
+  if ((nom = GetValue(argc, argv, "num_of_blocks")) == NULL) {
+    printf("Must specify '-num_of_blocks' argument!\n");
     Status = QUIC_STATUS_INVALID_PARAMETER;
     goto Error;
   }
-  num_of_msgs = atoi(nom);
-  percent = (float)num_of_msgs / 20;
+  num_of_blocks = atoi(nom);
+  percent = (float)num_of_blocks / 20;
 
   const char *som;
-  if ((som = GetValue(argc, argv, "size_of_msgs")) == NULL) {
-    printf("Must specify '-size_of_msgs' argument!\n");
+  if ((som = GetValue(argc, argv, "size_of_blocks")) == NULL) {
+    printf("Must specify '-size_of_blocks' argument!\n");
     Status = QUIC_STATUS_INVALID_PARAMETER;
     goto Error;
   }
-  size_of_msgs = atoi(som);
+  size_of_blocks = atoi(som);
 
   //
   // Allocate a new connection object.
