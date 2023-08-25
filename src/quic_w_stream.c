@@ -542,7 +542,7 @@ int ClientSend(_In_ HQUIC Stream) {
   // the stream is shut down (in the send direction) immediately after.
   //
 
-  for (unsigned int i = 0; i < num_of_msgs - 1; i++) {
+  for (unsigned int i = 0; i < num_of_msgs; i++) {
     SendBuffer = calloc(1, sizeof(QUIC_BUFFER) + size_of_msgs);
     if (SendBuffer == NULL) {
       printf("SendBuffer allocation failed!\n");
