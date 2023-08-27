@@ -1,6 +1,7 @@
 #include "msquic.h"
 #include <arpa/inet.h>
 #include <msquic_posix.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -54,7 +55,7 @@ float percent;
 
 char *final_block = "Closing Socket!";
 
-BOOLEAN ConnectedConnection = FALSE;
+pthread_mutex_t serverFinishedMutex = PTHREAD_MUTEX_INITIALIZER;
 
 BOOLEAN ServerFinished = FALSE;
 
@@ -279,7 +280,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     printf("[conn] All done\n");
     QuicApi->ConnectionClose(Connection);
     free(Buffer.Buffer);
+    pthread_mutex_lock(&serverFinishedMutex);
+
     ServerFinished = TRUE;
+    pthread_mutex_unlock(&serverFinishedMutex);
+
     break;
   case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
     //
@@ -462,8 +467,19 @@ void RunServer(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   // Continue listening for connections until the Enter key is pressed.
   //
   printf("Waiting for connection.\n\n");
-  while (ServerFinished == FALSE)
-    ;
+  while (1) {
+    pthread_mutex_lock(&serverFinishedMutex);
+    if (ServerFinished) {
+      pthread_mutex_unlock(&serverFinishedMutex);
+      break;
+    }
+    pthread_mutex_unlock(&serverFinishedMutex);
+
+    // Additional logic, if needed
+  }
+
+  // Clean up and exit
+  pthread_mutex_destroy(&serverFinishedMutex);
 
 Error:
 
@@ -605,7 +621,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     // The handshake has completed for the connection.
     //
     printf("[conn] Connected\n");
-    ConnectedConnection = TRUE;
 
     break;
   case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
@@ -780,9 +795,6 @@ void RunClient(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
     QuicApi->StreamClose(Stream);
     goto Error;
   }
-
-  while (ConnectedConnection == FALSE)
-    ;
 
   printf("Start sending messages!\n");
   ClientSend(Stream);
