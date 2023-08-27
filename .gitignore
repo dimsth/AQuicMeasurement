@@ -1,3 +1,4 @@
 build/
 cert/server.key
 cert/server.cert
+measurement/meas_*
