@@ -5,7 +5,7 @@ if [ $# -lt 3 ]; then
   echo "Usage: $0 <program_command> <client/server> <(ethtool) on/off>"
     exit 1
 fi
-output_folder="../measurments/meas_$2"
+output_folder="../measurements/meas_$2"
 mkdir "$output_folder"
 
 program_command="$1"
@@ -30,7 +30,7 @@ sar_pid=$!
 
 wait "$pid"  
 
-kill "$sar_pid"
+#kill "$sar_pid"
 
 if [ "$3" = "on" ]; then
   ethtool -S $4 > "$e_tool_after"
