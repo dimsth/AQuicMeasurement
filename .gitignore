@@ -2,3 +2,6 @@ build/
 cert/server.key
 cert/server.cert
 measurements/meas_*
+*.png
+scripts/make_graph.py
+scripts/venv*

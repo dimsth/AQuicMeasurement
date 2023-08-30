@@ -30,7 +30,7 @@ sar_pid=$!
 
 wait "$pid"  
 
-#kill "$sar_pid"
+kill "$sar_pid"
 
 if [ "$3" = "on" ]; then
   ethtool -S $4 > "$e_tool_after"
