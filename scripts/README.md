@@ -13,6 +13,9 @@ Example of Quic w/ Stream server:
 ```
 
 -arg 1: Executable Program with all the arguments inside ""
+<br />
 -arg 2: Name for the folder and some files
+<br />
 -arg 3: On/Off if you want to capture ethtool
+<br />
 -arg 4: Ethtool parameter for which interface name to look 
