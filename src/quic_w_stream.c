@@ -143,11 +143,8 @@ uint32_t DecodeHexBuffer(_In_z_ const char *HexBuffer,
 //
 void ServerSend(_In_ HQUIC Stream) {
   char message[100];
-  sprintf(
-      message,
-      "Received total number of blocks: %d \n Received total size of blocks: "
-      "%lld \n",
-      num_of_blocks, size_of_blocks - 16);
+  sprintf(message, "Received total size of blocks: %lld \n",
+          size_of_blocks - 16);
   printf("%s", message);
   //
   // Allocates and builds the buffer to send over the stream.
@@ -503,6 +500,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     ClientStreamCallback(_In_ HQUIC Stream, _In_opt_ void *Context,
                          _Inout_ QUIC_STREAM_EVENT *Event) {
   UNREFERENCED_PARAMETER(Context);
+  char response[200];
   switch (Event->Type) {
   case QUIC_STREAM_EVENT_SEND_COMPLETE:
     //
@@ -515,8 +513,27 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     // Data was received from the peer on the stream.
     //
+    memcpy(response, Event->RECEIVE.Buffers->Buffer,
+           strlen((char *)Event->RECEIVE.Buffers->Buffer));
     printf("[strm] Data received\n");
-    printf("%s", Event->RECEIVE.Buffers->Buffer);
+    printf("%s", response);
+
+    int offset = 31;
+
+    char total_io[15];
+    sprintf(total_io, "%lld", size_of_blocks * num_of_blocks);
+    int tio_len = strlen(total_io);
+    char final_io[15];
+    memcpy(final_io, response + offset, strlen(response) - offset + 1);
+
+    if (memcmp(final_io, total_io, tio_len) == 0) {
+      printf("Test completed sucessfully!! \n");
+    } else {
+      printf("Not all data was received from the server... \nShould have "
+             "received: %s, but received: %s",
+             total_io, final_io);
+    }
+
     break;
   case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
     //
