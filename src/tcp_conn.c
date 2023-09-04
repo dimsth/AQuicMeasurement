@@ -136,11 +136,8 @@ void RunServer(int argc, char *argv[], int socket_desc) {
     }
   }
 
-  sprintf(
-      message,
-      "Received total number of blocks: %d \n Received total size of blocks: "
-      "%lld \n",
-      num_of_blocks, size_of_blocks);
+  sprintf(message, "Received total size of blocks: %lld \n",
+          size_of_blocks - fm_size);
   printf("%s", message);
   // Send some data
   if (send(sock, message, strlen(message), 0) < 0) {
@@ -247,6 +244,22 @@ void RunClient(int argc, char *argv[], int hSocket) {
   if (SocketReceive(hSocket, response, sizeof(response) - 1) < 0) {
     printf("Receive failed\n");
     goto Error;
+  }
+
+  int offset = 31;
+
+  char total_io[15];
+  sprintf(total_io, "%lld", size_of_blocks * num_of_blocks);
+  int tio_len = strlen(total_io);
+  char final_io[15];
+  memcpy(final_io, response + offset, strlen(response) - offset + 1);
+
+  if (memcmp(final_io, total_io, tio_len) == 0) {
+    printf("Test completed sucessfully!! \n");
+  } else {
+    printf("Not all data was received from the server... \nShould have "
+           "received: %s, but received: %s",
+           total_io, final_io);
   }
 
 Error:
