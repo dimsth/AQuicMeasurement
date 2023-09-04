@@ -113,9 +113,9 @@ void RunServer(int argc, char *argv[], int socket_desc) {
 
   int fm_size = strlen(final_block) + 1;
   int ret;
+  memset(Buffer, 0, MAX_BUFFER_SIZE);
   // Accept and incoming connection
   while (1) {
-    memset(Buffer, 0, MAX_BUFFER_SIZE);
 
     //  Receive a reply from the client
     ret = recv(sock, Buffer, MAX_BUFFER_SIZE, 0);
