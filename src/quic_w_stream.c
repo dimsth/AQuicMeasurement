@@ -57,6 +57,8 @@ char *final_block = "Closing Socket!";
 
 pthread_mutex_t serverFinishedMutex = PTHREAD_MUTEX_INITIALIZER;
 
+pthread_cond_t serverFinishedCond = PTHREAD_COND_INITIALIZER;
+
 BOOLEAN ServerFinished = FALSE;
 
 QUIC_BUFFER Buffer;
@@ -280,9 +282,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     printf("[conn] All done\n");
     QuicApi->ConnectionClose(Connection);
     free(Buffer.Buffer);
-    pthread_mutex_lock(&serverFinishedMutex);
 
     ServerFinished = TRUE;
+
+    pthread_cond_signal(&serverFinishedCond);
+
     pthread_mutex_unlock(&serverFinishedMutex);
 
     break;
@@ -294,6 +298,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     printf("[strm] Peer started\n");
     QuicApi->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream,
                                 (void *)ServerStreamCallback, NULL);
+    pthread_mutex_lock(&serverFinishedMutex);
     break;
   case QUIC_CONNECTION_EVENT_RESUMED:
     //
@@ -359,8 +364,8 @@ ServerLoadConfiguration(_In_ int argc,
   //
   Settings.IdleTimeoutMs = IDLE_TIMEOUT;
   Settings.IsSet.IdleTimeoutMs = TRUE;
-  Settings.StreamRecvBufferDefault = 5 * 1024 * 1024;
-  Settings.StreamRecvWindowDefault = 5 * 1024 * 1024;
+  Settings.StreamRecvBufferDefault = MAX_BUFFER_SIZE;
+  Settings.StreamRecvWindowDefault = MAX_BUFFER_SIZE;
 
   //
   // Configures the server's resumption level to allow for resumption and
@@ -467,7 +472,7 @@ void RunServer(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
   // Continue listening for connections until the Enter key is pressed.
   //
   printf("Waiting for connection.\n\n");
-  while (1) {
+  /*while (1) {
     pthread_mutex_lock(&serverFinishedMutex);
     if (ServerFinished) {
       pthread_mutex_unlock(&serverFinishedMutex);
@@ -475,8 +480,10 @@ void RunServer(_In_ int argc, _In_reads_(argc) _Null_terminated_ char *argv[]) {
     }
     pthread_mutex_unlock(&serverFinishedMutex);
 
-    // Additional logic, if needed
-  }
+  }*/
+
+  while (!ServerFinished)
+    pthread_cond_wait(&serverFinishedCond, &serverFinishedMutex);
 
   // Clean up and exit
   pthread_mutex_destroy(&serverFinishedMutex);
