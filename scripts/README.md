@@ -13,9 +13,7 @@ Example of Quic w/ Stream server:
 ```
 
 - arg 1: Name for the folder and some files
-<br />
 - arg 2: On/Off if you want to capture ethtool
-<br />
 - [arg 3: Ethtool parameter for which interface name to look] (only when ethtool on)
 <br />
 
@@ -26,9 +24,7 @@ Example of Quic w/ Stream client(s):
 ```
 
 - arg 1: Number of clients to run
-<br />
 - arg 2: Name for the folder and some files
-<br />
 - arg 3: IP address to target 
 <br />
 
@@ -42,11 +38,8 @@ Example of Quic w/ Stream server:
 ```
 
 - arg 1: Number of servers to run
-<br />
 - arg 2: Name for the folder and some files
-<br />
 - arg 3: On/Off if you want to capture ethtool
-<br />
 - [arg 4: Ethtool parameter for which interface name to look] (only when ethtool on) 
 <br />
 
@@ -57,8 +50,6 @@ Example of Quic w/ Stream client(s):
 ```
 
 - arg 1: Number of clients to run
-<br />
 - arg 2: Name for the folder and some files
-<br />
 - arg 3: IP address to target 
 <br />
