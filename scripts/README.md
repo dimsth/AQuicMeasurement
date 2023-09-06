@@ -31,7 +31,7 @@ Example of Quic w/ Stream client(s):
 
 ## MEASURE CPU TCP
 
-Example of Quic w/ Stream server:
+Example of TCP server(s):
 
 ```
 ./tcp_measure_cpu_servers.sh 2 server_name off
@@ -43,7 +43,7 @@ Example of Quic w/ Stream server:
 - [arg 4: Ethtool parameter for which interface name to look] (only when ethtool on) 
 <br />
 
-Example of Quic w/ Stream client(s):
+Example of TCP client(s):
 
 ```
 ./run_clients.sh TCP 2 127.0.0.1

@@ -13,9 +13,9 @@ e_tool_before="$output_folder/ethtool_before_$2.txt"
 e_tool_after="$output_folder/ethtool_after_$2.txt"
 
 # Check if Ethtool is set to 'on'
-if [ "$1" = "on" ]; then
-  if [ -n "$2" ]; then
-    interface_name="$2"
+if [ "$3" = "on" ]; then
+  if [ -n "$4" ]; then
+    interface_name="$4"
     ethtool -S "$interface_name" > "$e_tool_before"
   else
     echo "Ethtool is set to 'on' but no interface name provided."
@@ -58,7 +58,7 @@ kill $(jobs -p)
 
 kill "$sar_pid"
 
-if [ "$1" = "on" ]; then
+if [ "$3" = "on" ]; then
   ethtool -S "$interface_name" > "$e_tool_after"
 fi
 
