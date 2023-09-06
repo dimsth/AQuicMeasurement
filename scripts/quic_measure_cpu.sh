@@ -2,7 +2,7 @@
 
 # Check if at least two arguments are provided
 if [ $# -lt 2 ]; then
-  echo "Usage: $0 <client/server> <(ethtool) on/off>"
+  echo "Usage: $0 <server> <(ethtool) on/off>"
     exit 1
 fi
 output_folder="../measurements/meas_$1"
