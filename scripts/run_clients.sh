@@ -22,7 +22,7 @@ fi
 # Loop to run 'num_clients' clients
 for ((i = 0; i < num_clients; i++)); do
 
-  output_file="$output_folder/client_log_$i.txt"
+  output_file="client_log_$i.txt"
   # Run the client with a unique port number for each client (incrementing by 1)
   port=$((8880 + i))
   echo "Running client $i on port $port"

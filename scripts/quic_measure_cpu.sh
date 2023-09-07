@@ -26,9 +26,6 @@ else
   echo "Ethtool is set to 'off' or no interface name provided."
 fi
 
-sar -u 1 >> "$file_path_util" &
-sar_pid=$!
-
 output_file="$output_folder/server_log.txt"
 
 # Run the provided program command in the background
@@ -36,6 +33,9 @@ eval "$program_command" > "$output_file" &
 
 # Capture the process ID (PID) of the program
 pid=$!
+
+sar -u 1 >> "$file_path_util" &
+sar_pid=$!
 
 wait "$pid"  
 
