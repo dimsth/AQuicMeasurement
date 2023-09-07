@@ -31,6 +31,10 @@ base_command="./../build/src/tcp_conn -server"
 # Number of server instances to run
 num_servers=$1  # You can change this to the desired number
 
+# Start CPU monitoring with sar
+sar -u 1 >> "$file_path_util" &
+sar_pid=$!
+
 # Loop to run 'num_servers' server instances with different ports
 for ((i = 0; i < num_servers; i++)); do
   # Run the server with a unique port number for each instance (incrementing by 1)
@@ -43,10 +47,6 @@ done
 
 # Capture the process IDs (PIDs) of all server instances
 server_pids=($(jobs -p))
-
-# Start CPU monitoring with sar
-sar -u 1 >> "$file_path_util" &
-sar_pid=$!
 
 # Wait for all server instances to finish
 for pid in "${server_pids[@]}"; do
