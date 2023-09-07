@@ -65,6 +65,8 @@ QUIC_BUFFER Buffer;
 
 QUIC_BUFFER FinalBuffer;
 
+int connectedClients = 0;
+
 void PrintUsage() {
   printf("\n"
          "quic connection using streams runs client or server.\n"
@@ -278,14 +280,16 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
     //
     printf("[conn] All done\n");
     QuicApi->ConnectionClose(Connection);
-    free(Buffer.Buffer);
+    connectedClients--;
+    if (!connectedClients) {
+      free(Buffer.Buffer);
 
-    ServerFinished = TRUE;
+      ServerFinished = TRUE;
 
-    pthread_cond_signal(&serverFinishedCond);
+      pthread_cond_signal(&serverFinishedCond);
 
-    pthread_mutex_unlock(&serverFinishedMutex);
-
+      pthread_mutex_unlock(&serverFinishedMutex);
+    }
     break;
   case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
     //
@@ -327,6 +331,7 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
     // proceed, the server must provide a configuration for QUIC to use. The
     // app MUST set the callback handler before returning.
     //
+    connectedClients++;
     QuicApi->SetCallbackHandler(Event->NEW_CONNECTION.Connection,
                                 (void *)ServerConnectionCallback, NULL);
     Status = QuicApi->ConnectionSetConfiguration(
