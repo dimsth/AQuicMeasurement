@@ -6,7 +6,9 @@ if [ $# -lt 2 ]; then
     exit 1
 fi
 output_folder="../measurements/meas_$1"
-mkdir "$output_folder"
+if [ ! -d "$output_folder" ]; then
+  mkdir "$output_folder"
+fi
 
 program_command="./../build/src/q_stream -server -cert_file:../cert/server.cert -key_file:../cert/server.key"
 file_path_util="$output_folder/cpu_util_log_$1.txt"
@@ -26,10 +28,8 @@ else
   echo "Ethtool is set to 'off' or no interface name provided."
 fi
 
-output_file="$output_folder/server_log.txt"
-
 # Run the provided program command in the background
-eval "$program_command" > "$output_file" &
+eval "$program_command" &
 
 # Capture the process ID (PID) of the program
 pid=$!

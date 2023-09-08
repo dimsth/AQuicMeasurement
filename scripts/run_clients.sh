@@ -11,9 +11,9 @@ num_clients=$2
 
 # Define the base command without the -port argument
 if [ "$1" = "Quic" ]; then
-  base_command="./../build/src/q_stream -client -unsecure -num_of_blocks:10 -size_of_blocks:100"
+  base_command="./../build/src/q_stream -client -unsecure -num_of_blocks:163840 -size_of_blocks:65536"
 elif [ "$1" = "TCP" ]; then
-  base_command="./../build/src/tcp_conn -client -num_of_blocks:10 -size_of_blocks:100"
+  base_command="./../build/src/tcp_conn -client -num_of_blocks:163840 -size_of_blocks:65536"
 else
   echo "Invalid transport protocol. Use 'Quic' or 'TCP'."
   exit 1
